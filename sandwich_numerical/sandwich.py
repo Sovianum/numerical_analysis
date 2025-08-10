@@ -392,12 +392,6 @@ class Sandwich:
         This private method prepares for the next iteration by making the
         computed next_state arrays the new current_state arrays.
         """
-        self.bottom._state, self.bottom._next_state = self.bottom._next_state, self.bottom._state
-        self.mid._state, self.mid._next_state = self.mid._next_state, self.mid._state
-        self.top._state, self.top._next_state = self.top._next_state, self.top._state
-
-
-
-
-
-
+        self.bottom.swap()
+        self.mid.swap()
+        self.top.swap()
