@@ -34,7 +34,6 @@ class MeshBlock:
             raise ValueError("Shape must be 2-dimensional (height, width)")
         
         self._state = np.zeros(shape, dtype=dtype)
-        self._next_state = np.zeros(shape, dtype=dtype)
         self._shape = shape
         self._dtype = dtype
     
@@ -47,16 +46,6 @@ class MeshBlock:
             The current state array (read-only view)
         """
         return self._state.view()
-    
-    @property
-    def next_state(self) -> np.ndarray:
-        """
-        Get the current next state array.
-        
-        Returns:
-            The current next state array (read-only view)
-        """
-        return self._next_state.view()
     
     @property
     def shape(self) -> tuple:
@@ -98,56 +87,6 @@ class MeshBlock:
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
     
-    def set_next_state(self, new_state: np.ndarray) -> None:
-        """
-        Update the next state array in-place with new values.
-        
-        Args:
-            new_state: New state array to copy into the next state
-            
-        Raises:
-            ValueError: If the new state has incompatible shape
-        """
-        if not isinstance(new_state, np.ndarray):
-            raise TypeError("new_state must be a numpy array")
-        
-        if new_state.shape != self._shape:
-            raise ValueError(f"Shape mismatch: expected {self._shape}, got {new_state.shape}")
-        
-        # Copy the new state into the existing next array (in-place update)
-        # This will automatically handle dtype conversion if needed
-        np.copyto(self._next_state, new_state)
-    
-    def _preprocess_boundary_values(self, boundary: BoundaryType, values: Union[np.ndarray, float, int]) -> np.ndarray:
-        """
-        Preprocess boundary values to ensure they are in the correct format.
-        
-        Args:
-            boundary: Boundary to update (must be BoundaryType enum)
-            values: Values to set. Can be:
-                - Single number (float/int) to set all boundary points to the same value
-                - 1D numpy array with length matching the boundary dimension
-                - 2D numpy array with shape matching the boundary
-        
-        Returns:
-            Preprocessed numpy array with correct shape and dtype
-            
-        Raises:
-            ValueError: If values have incompatible shape
-            TypeError: If values are not a number or numpy array
-        """
-        if isinstance(values, (int, float)):
-            # Convert single value to appropriate array
-            if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
-                values = np.full(self._shape[0], values, dtype=self._dtype)
-            else:  # TOP, BOTTOM
-                values = np.full(self._shape[1], values, dtype=self._dtype)
-        
-        if not isinstance(values, np.ndarray):
-            raise TypeError("Values must be a number or numpy array")
-        
-        return values
-
     def set_boundary_values(self, boundary: BoundaryType, values: Union[np.ndarray, float, int]) -> None:
         """
         Update boundary values of the mesh block.
@@ -265,6 +204,42 @@ class MeshBlock:
             valid_boundaries = [b.value for b in BoundaryType]
             raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
+    def _preprocess_boundary_values(self, boundary: BoundaryType, values: Union[np.ndarray, float, int]) -> np.ndarray:
+        """
+        Preprocess boundary values to ensure correct format and validate shape.
+        
+        Args:
+            boundary: Boundary type to determine expected shape
+            values: Input values (can be number or numpy array)
+            
+        Returns:
+            Preprocessed numpy array with correct shape and dtype
+            
+        Raises:
+            TypeError: If values is not a number or numpy array
+            ValueError: If values have incompatible shape
+        """
+        values_array = values
+        if isinstance(values, (int, float)):
+            if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
+                values_array = np.full(self._shape[0], values, dtype=self._dtype)
+            else:  # TOP, BOTTOM
+                values_array = np.full(self._shape[1], values, dtype=self._dtype)
+        elif isinstance(values, np.ndarray):
+            values_array = values
+        else:
+            raise TypeError("values must be a number or numpy array")
+        
+        # Validate value shape
+        if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
+            if values_array.shape != (self._shape[0],):
+                raise ValueError(f"Left/Right boundary values must have shape ({self._shape[0]},), got {values_array.shape}")
+        else:  # TOP, BOTTOM
+            if values_array.shape != (self._shape[1],):
+                raise ValueError(f"Top/Bottom boundary values must have shape ({self._shape[1]},), got {values_array.shape}")
+        
+        return values_array
+    
     def _preprocess_gradients(self, boundary: BoundaryType, gradients: Union[np.ndarray, float, int]) -> np.ndarray:
         """
         Preprocess gradients to ensure correct format and validate shape.
@@ -358,26 +333,10 @@ class MeshBlock:
             valid_boundaries = [b.value for b in BoundaryType]
             raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
-    def apply(self, func: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> None:
-        """
-        Apply a callable function that uses both the main state and next state.
-        
-        Args:
-            func: A callable that takes (state, next_state) as arguments and returns the new state
-        """
-        new_state = func(self._state, self._next_state)
-        self._state = new_state
-    
-    def swap(self) -> None:
-        """
-        Swap the main state with the next state.
-        """
-        self._state, self._next_state = self._next_state, self._state
-    
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
         return f"MeshBlock(shape={self._shape}, dtype={self._dtype})"
     
     def __str__(self) -> str:
-        """String representation showing the current state and next state."""
-        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}\nNext State:\n{self._next_state}" 
+        """String representation showing the current state."""
+        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}" 

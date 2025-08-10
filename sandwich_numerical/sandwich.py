@@ -199,12 +199,18 @@ class Sandwich:
         
         self.block_height = block_size[0]
 
-        self.top = MeshBlock(block_size)
-        self.bottom = MeshBlock(block_size)
+        # Current state blocks
+        self.top_curr = MeshBlock(block_size)
+        self.bottom_curr = MeshBlock(block_size)
         
         # we need one more row from each side because of boundary conditions
         mid_block_size = (block_size[0] + 2, block_size[1])
-        self.mid = MeshBlock(mid_block_size)
+        self.mid_curr = MeshBlock(mid_block_size)
+        
+        # Next state blocks
+        self.top_next = MeshBlock(block_size)
+        self.bottom_next = MeshBlock(block_size)
+        self.mid_next = MeshBlock(mid_block_size)
         
     def step(self):
         """
@@ -267,9 +273,9 @@ class Sandwich:
         """
         return np.concatenate(
             (
-                self.bottom._state, 
-                self.mid._state[1:-1], # remove boundary conditions paddings 
-                self.top._state
+                self.bottom_curr._state, 
+                self.mid_curr._state[1:-1], # remove boundary conditions paddings 
+                self.top_curr._state
             )
         )
     
@@ -291,7 +297,7 @@ class Sandwich:
             during iterative solution.
         """
         results = []
-        for block in [self.bottom._state, self.mid._state, self.top._state]:
+        for block in [self.bottom_curr._state, self.mid_curr._state, self.top_curr._state]:
             res_block = np.zeros_like(block)
             set_laplace_update(block, res_block)
             
@@ -319,20 +325,20 @@ class Sandwich:
             appropriate boundary condition functions for each block.
         """
         set_boundary_conditions_bottom_block(
-            self.bottom._state, 
-            self.bottom._next_state, 
+            self.bottom_curr._state, 
+            self.bottom_next._state, 
             self.grad_vec[:self.block_height], 
             self.grid_step
         )
         set_boundary_conditions_middle_block(
-            self.mid._state, 
-            self.mid._next_state, 
+            self.mid_curr._state, 
+            self.mid_next._state, 
             self.grad_vec[self.block_height-1:2*self.block_height+1], 
             self.grid_step
         )
         set_boundary_conditions_top_block(
-            self.top._state, 
-            self.top._next_state, 
+            self.top_curr._state, 
+            self.top_next._state, 
             self.grad_vec[2*self.block_height:3*self.block_height], 
             self.grid_step
         )
@@ -344,8 +350,8 @@ class Sandwich:
         This private method updates the next_state arrays of the bottom and top blocks
         by applying the finite difference Laplace operator to their current states.
         """
-        set_laplace_update(self.bottom._state, self.bottom._next_state)
-        set_laplace_update(self.top._state, self.top._next_state)
+        set_laplace_update(self.bottom_curr._state, self.bottom_next._state)
+        set_laplace_update(self.top_curr._state, self.top_next._state)
         
     def _make_laplace_step_inner(self):
         """
@@ -354,7 +360,7 @@ class Sandwich:
         This private method updates the next_state array of the middle block
         by applying the finite difference Laplace operator to its current state.
         """
-        set_laplace_update(self.mid._state, self.mid._next_state)    
+        set_laplace_update(self.mid_curr._state, self.mid_next._state)    
         
     def _transfer_info_inwards(self):
         """
@@ -365,9 +371,9 @@ class Sandwich:
         to the middle block using the prescribed grad_factor.
         """
         transfer_data_inwards(
-            self.bottom._state,
-            self.top._state,
-            self.mid._state,
+            self.bottom_curr._state,
+            self.top_curr._state,
+            self.mid_curr._state,
             self.grad_factor
         )
         
@@ -379,9 +385,9 @@ class Sandwich:
         solution, ensuring consistency across all block boundaries.
         """
         transfer_data_outwards(
-            self.bottom._next_state,
-            self.top._next_state,
-            self.mid._next_state,
+            self.bottom_next._state,
+            self.top_next._state,
+            self.mid_next._state,
             self.grad_factor
         )
         
@@ -392,9 +398,9 @@ class Sandwich:
         This private method prepares for the next iteration by making the
         computed next_state arrays the new current_state arrays.
         """
-        self.bottom._state, self.bottom._next_state = self.bottom._next_state, self.bottom._state
-        self.mid._state, self.mid._next_state = self.mid._next_state, self.mid._state
-        self.top._state, self.top._next_state = self.top._next_state, self.top._state
+        self.bottom_curr._state, self.bottom_next._state = self.bottom_next._state, self.bottom_curr._state
+        self.mid_curr._state, self.mid_next._state = self.mid_next._state, self.mid_curr._state
+        self.top_curr._state, self.top_next._state = self.top_next._state, self.top_curr._state
 
 
 
