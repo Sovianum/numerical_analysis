@@ -4,7 +4,7 @@ Tests for the MeshBlock class.
 
 import pytest
 import numpy as np
-from sandwich_numerical.solver.mesh_block import MeshBlock
+from sandwich_numerical.solver.mesh_block import MeshBlock, BoundaryType
 
 
 class TestMeshBlock:
@@ -77,10 +77,10 @@ class TestMeshBlock:
     def test_set_boundary_values_with_single_values(self, sample_block):
         """Test setting boundary values with single numbers."""
         # Set all boundaries to different values
-        sample_block.set_boundary_values('left', 1.0)
-        sample_block.set_boundary_values('right', 2.0)
-        sample_block.set_boundary_values('top', 3.0)
-        sample_block.set_boundary_values('bottom', 4.0)
+        sample_block.set_boundary_values(BoundaryType.LEFT, 1.0)
+        sample_block.set_boundary_values(BoundaryType.RIGHT, 2.0)
+        sample_block.set_boundary_values(BoundaryType.TOP, 3.0)
+        sample_block.set_boundary_values(BoundaryType.BOTTOM, 4.0)
         
         expected = np.array([[3.0, 3.0, 3.0, 3.0],
                             [1.0, 0.0, 0.0, 2.0],
@@ -92,11 +92,11 @@ class TestMeshBlock:
         """Test setting boundary values with arrays."""
         # Set left boundary with array
         left_values = np.array([10.0, 20.0, 30.0])
-        sample_block.set_boundary_values('left', left_values)
+        sample_block.set_boundary_values(BoundaryType.LEFT, left_values)
         
         # Set top boundary with array
         top_values = np.array([100.0, 200.0, 300.0, 400.0])
-        sample_block.set_boundary_values('top', top_values)
+        sample_block.set_boundary_values(BoundaryType.TOP, top_values)
         
         expected = np.array([[100.0, 200.0, 300.0, 400.0],
                             [20.0, 0.0, 0.0, 0.0],
@@ -106,28 +106,28 @@ class TestMeshBlock:
     
     def test_set_boundary_values_with_invalid_boundary(self, sample_block):
         """Test that set_boundary_values fails with invalid boundary names."""
-        with pytest.raises(ValueError, match="Boundary must be one of: 'left', 'right', 'top', 'bottom'"):
+        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
             sample_block.set_boundary_values('invalid', 1.0)
         
-        with pytest.raises(ValueError, match="Boundary must be one of: 'left', 'right', 'top', 'bottom'"):
+        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
             sample_block.set_boundary_values('center', 1.0)
         
-        with pytest.raises(ValueError, match="Boundary must be one of: 'left', 'right', 'top', 'bottom'"):
+        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
             sample_block.set_boundary_values('', 1.0)
     
     def test_boundary_values_with_different_dtypes(self, sample_block):
         """Test setting boundary values with different dtypes."""
         # Test with integer values
-        sample_block.set_boundary_values('left', 5)
-        sample_block.set_boundary_values('top', 10)
+        sample_block.set_boundary_values(BoundaryType.LEFT, 5)
+        sample_block.set_boundary_values(BoundaryType.TOP, 10)
         
         # Test with float32 array
         right_values = np.array([1.0, 2.0, 3.0], dtype=np.float32)
-        sample_block.set_boundary_values('right', right_values)
+        sample_block.set_boundary_values(BoundaryType.RIGHT, right_values)
         
         # Test with int32 array
         bottom_values = np.array([100, 200, 300, 400], dtype=np.int32)
-        sample_block.set_boundary_values('bottom', bottom_values)
+        sample_block.set_boundary_values(BoundaryType.BOTTOM, bottom_values)
         
         expected = np.array([[10.0, 10.0, 10.0, 1.0],
                             [5.0, 0.0, 0.0, 2.0],
@@ -138,13 +138,13 @@ class TestMeshBlock:
     def test_multiple_boundary_updates(self, sample_block):
         """Test multiple updates to the same boundary."""
         # Update left boundary multiple times
-        sample_block.set_boundary_values('left', 1.0)
-        sample_block.set_boundary_values('left', 5.0)
-        sample_block.set_boundary_values('left', np.array([10.0, 20.0, 30.0]))
+        sample_block.set_boundary_values(BoundaryType.LEFT, 1.0)
+        sample_block.set_boundary_values(BoundaryType.LEFT, 5.0)
+        sample_block.set_boundary_values(BoundaryType.LEFT, np.array([10.0, 20.0, 30.0]))
         
         # Update top boundary multiple times
-        sample_block.set_boundary_values('top', 100.0)
-        sample_block.set_boundary_values('top', np.array([1.0, 2.0, 3.0, 4.0]))
+        sample_block.set_boundary_values(BoundaryType.TOP, 100.0)
+        sample_block.set_boundary_values(BoundaryType.TOP, np.array([1.0, 2.0, 3.0, 4.0]))
         
         expected = np.array([[1.0, 2.0, 3.0, 4.0],
                             [20.0, 0.0, 0.0, 0.0],
