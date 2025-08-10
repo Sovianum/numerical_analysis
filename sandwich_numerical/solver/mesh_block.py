@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Union
 
 
 class MeshBlock:
@@ -10,16 +9,16 @@ class MeshBlock:
     a safe interface for updating the state in-place.
     """
     
-    def __init__(self, shape: Union[tuple, int], dtype: np.dtype = np.float64):
+    def __init__(self, shape: tuple, dtype: np.dtype = np.float64):
         """
         Initialize a MeshBlock with a numpy array of the specified shape.
         
         Args:
-            shape: Shape of the array (height, width) or single dimension for square array
+            shape: Shape of the array as a tuple (height, width)
             dtype: Data type for the array (default: np.float64)
         """
-        if isinstance(shape, int):
-            shape = (shape, shape)
+        if not isinstance(shape, tuple):
+            raise TypeError("Shape must be a tuple (height, width)")
         
         if len(shape) != 2:
             raise ValueError("Shape must be 2-dimensional (height, width)")
