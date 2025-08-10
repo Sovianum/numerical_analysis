@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Union
+from typing import Union, Callable
 from enum import Enum
 
 
@@ -34,6 +34,7 @@ class MeshBlock:
             raise ValueError("Shape must be 2-dimensional (height, width)")
         
         self._state = np.zeros(shape, dtype=dtype)
+        self._shadow_state = np.zeros(shape, dtype=dtype)
         self._shape = shape
         self._dtype = dtype
     
@@ -46,6 +47,16 @@ class MeshBlock:
             The current state array (read-only view)
         """
         return self._state.view()
+    
+    @property
+    def shadow_state(self) -> np.ndarray:
+        """
+        Get the current shadow state array.
+        
+        Returns:
+            The current shadow state array (read-only view)
+        """
+        return self._shadow_state.view()
     
     @property
     def shape(self) -> tuple:
@@ -86,6 +97,26 @@ class MeshBlock:
         # Copy the new state into the existing array (in-place update)
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
+    
+    def set_shadow_state(self, new_state: np.ndarray) -> None:
+        """
+        Update the shadow state array in-place with new values.
+        
+        Args:
+            new_state: New state array to copy into the shadow state
+            
+        Raises:
+            ValueError: If the new state has incompatible shape
+        """
+        if not isinstance(new_state, np.ndarray):
+            raise TypeError("new_state must be a numpy array")
+        
+        if new_state.shape != self._shape:
+            raise ValueError(f"Shape mismatch: expected {self._shape}, got {new_state.shape}")
+        
+        # Copy the new state into the existing shadow array (in-place update)
+        # This will automatically handle dtype conversion if needed
+        np.copyto(self._shadow_state, new_state)
     
     def _preprocess_boundary_values(self, boundary: BoundaryType, values: Union[np.ndarray, float, int]) -> np.ndarray:
         """
@@ -327,10 +358,26 @@ class MeshBlock:
             valid_boundaries = [b.value for b in BoundaryType]
             raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
+    def apply(self, func: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> None:
+        """
+        Apply a callable function that uses both the main state and shadow state.
+        
+        Args:
+            func: A callable that takes (state, shadow_state) as arguments and returns the new state
+        """
+        new_state = func(self._state, self._shadow_state)
+        self._state = new_state
+    
+    def swap(self) -> None:
+        """
+        Swap the main state with the shadow state.
+        """
+        self._state, self._shadow_state = self._shadow_state, self._state
+    
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
         return f"MeshBlock(shape={self._shape}, dtype={self._dtype})"
     
     def __str__(self) -> str:
-        """String representation showing the current state."""
-        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}" 
+        """String representation showing the current state and shadow state."""
+        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}\nShadow State:\n{self._shadow_state}" 

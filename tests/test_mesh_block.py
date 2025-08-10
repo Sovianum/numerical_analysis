@@ -275,5 +275,123 @@ class TestMeshBlock:
         bottom_grad = mesh.get_boundary_gradients(BoundaryType.BOTTOM)
         np.testing.assert_array_equal(bottom_grad, np.array([0.5, 1.0, 1.5]))
     
+    def test_shadow_state_initialization(self, sample_block):
+        """Test that shadow state is properly initialized."""
+        assert sample_block.shadow_state.shape == (3, 4)
+        assert sample_block.shadow_state.dtype == np.float64
+        assert np.all(sample_block.shadow_state == 0.0)
+        assert sample_block.shadow_state is not sample_block._shadow_state  # Should be a view
+    
+    def test_set_shadow_state(self, sample_block):
+        """Test setting shadow state with a valid numpy array."""
+        new_shadow_state = np.array([[10.0, 20.0, 30.0, 40.0],
+                                     [50.0, 60.0, 70.0, 80.0],
+                                     [90.0, 100.0, 110.0, 120.0]])
+        
+        sample_block.set_shadow_state(new_shadow_state)
+        
+        # Check that the shadow state was updated
+        assert np.array_equal(sample_block.shadow_state, new_shadow_state)
+        # Check that it's the same array (in-place update)
+        assert sample_block.shadow_state is not new_shadow_state
+    
+    def test_apply_method(self, sample_block):
+        """Test the apply method with a callable function."""
+        # Set up initial states
+        sample_block.set_state(np.array([[1.0, 2.0, 3.0, 4.0],
+                                         [5.0, 6.0, 7.0, 8.0],
+                                         [9.0, 10.0, 11.0, 12.0]]))
+        sample_block.set_shadow_state(np.array([[100.0, 200.0, 300.0, 400.0],
+                                               [500.0, 600.0, 700.0, 800.0],
+                                               [900.0, 1000.0, 1100.0, 1200.0]]))
+        
+        # Define a function that returns a copy of shadow state
+        def copy_shadow_to_main(state, shadow_state):
+            return shadow_state.copy()
+        
+                # Apply the function
+        sample_block.apply(copy_shadow_to_main)
+        
+        # Check that the main state was updated with shadow state values
+        expected_state = np.array([[100.0, 200.0, 300.0, 400.0],
+                                   [500.0, 600.0, 700.0, 800.0],
+                                   [900.0, 1000.0, 1100.0, 1200.0]])
+        assert np.array_equal(sample_block.state, expected_state)
+        
+        # Check that shadow state remains unchanged
+        assert np.array_equal(sample_block.shadow_state, expected_state)
+    
+    def test_apply_method_with_modification(self, sample_block):
+        """Test the apply method with a function that modifies both states."""
+        # Set up initial states
+        sample_block.set_state(np.array([[1.0, 2.0, 3.0, 4.0],
+                                         [5.0, 6.0, 7.0, 8.0],
+                                         [9.0, 10.0, 11.0, 12.0]]))
+        sample_block.set_shadow_state(np.array([[10.0, 20.0, 30.0, 40.0],
+                                               [50.0, 60.0, 70.0, 80.0],
+                                               [90.0, 100.0, 110.0, 120.0]]))
+        
+        # Define a function that returns the sum of main state and shadow state
+        def add_shadow_to_main(state, shadow_state):
+            return state + shadow_state
+        
+                # Apply the function
+        sample_block.apply(add_shadow_to_main)
+        
+        # Check that the main state was updated correctly
+        expected_state = np.array([[11.0, 22.0, 33.0, 44.0],
+                                   [55.0, 66.0, 77.0, 88.0],
+                                   [99.0, 110.0, 121.0, 132.0]])
+        assert np.array_equal(sample_block.state, expected_state)
+    
+    def test_swap_method(self, sample_block):
+        """Test the swap method that exchanges main and shadow states."""
+        # Set up different initial states
+        main_state = np.array([[1.0, 2.0, 3.0, 4.0],
+                               [5.0, 6.0, 7.0, 8.0],
+                               [9.0, 10.0, 11.0, 12.0]])
+        shadow_state = np.array([[100.0, 200.0, 300.0, 400.0],
+                                [500.0, 600.0, 700.0, 800.0],
+                                [900.0, 1000.0, 1100.0, 1200.0]])
+        
+        sample_block.set_state(main_state)
+        sample_block.set_shadow_state(shadow_state)
+        
+        # Store references to verify they're actually swapped
+        original_main = sample_block.state.copy()
+        original_shadow = sample_block.shadow_state.copy()
+        
+        # Perform swap
+        sample_block.swap()
+        
+        # Check that states are now swapped
+        assert np.array_equal(sample_block.state, original_shadow)
+        assert np.array_equal(sample_block.shadow_state, original_main)
+    
+    def test_swap_method_preserves_data(self, sample_block):
+        """Test that swap method preserves data integrity."""
+        # Set up states with different values
+        sample_block.set_state(np.array([[1.0, 2.0, 3.0, 4.0],
+                                         [5.0, 6.0, 7.0, 8.0],
+                                         [9.0, 10.0, 11.0, 12.0]]))
+        sample_block.set_shadow_state(np.array([[0.1, 0.2, 0.3, 0.4],
+                                               [0.5, 0.6, 0.7, 0.8],
+                                               [0.9, 1.0, 1.1, 1.2]]))
+        
+        # Perform multiple swaps
+        sample_block.swap()
+        sample_block.swap()
+        
+        # After two swaps, states should be back to original
+        expected_main = np.array([[1.0, 2.0, 3.0, 4.0],
+                                  [5.0, 6.0, 7.0, 8.0],
+                                  [9.0, 10.0, 11.0, 12.0]])
+        expected_shadow = np.array([[0.1, 0.2, 0.3, 0.4],
+                                    [0.5, 0.6, 0.7, 0.8],
+                                    [0.9, 1.0, 1.1, 1.2]])
+        
+        assert np.array_equal(sample_block.state, expected_main)
+        assert np.array_equal(sample_block.shadow_state, expected_shadow)
+    
 if __name__ == "__main__":
     pytest.main([__file__]) 
