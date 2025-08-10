@@ -36,12 +36,12 @@ class TestSandwich:
     
     def test_state_arrays(self, sample_mesh):
         """Test that state arrays are properly initialized."""
-        assert sample_mesh.curr_state_bottom.shape == (10, 10)
-        assert sample_mesh.curr_state_mid.shape == (12, 10)  # +2 rows for boundary conditions
-        assert sample_mesh.curr_state_top.shape == (10, 10)
-        assert sample_mesh.next_state_bottom.shape == (10, 10)
-        assert sample_mesh.next_state_mid.shape == (12, 10)  # +2 rows for boundary conditions
-        assert sample_mesh.next_state_top.shape == (10, 10)
+        assert sample_mesh.bottom.state.shape == (10, 10)
+        assert sample_mesh.mid.state.shape == (12, 10)  # +2 rows for boundary conditions
+        assert sample_mesh.top.state.shape == (10, 10)
+        assert sample_mesh.bottom.next_state.shape == (10, 10)
+        assert sample_mesh.mid.next_state.shape == (12, 10)  # +2 rows for boundary conditions
+        assert sample_mesh.top.next_state.shape == (10, 10)
     
     def test_step_method(self, sample_mesh):
         """Test that the step method executes without error."""
