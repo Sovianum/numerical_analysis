@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Union
 
 
 class MeshBlock:
@@ -76,6 +77,53 @@ class MeshBlock:
         # Copy the new state into the existing array (in-place update)
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
+    
+    def set_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> None:
+        """
+        Update boundary values of the mesh block.
+        
+        Args:
+            boundary: Boundary to update ('left', 'right', 'top', 'bottom')
+            values: Values to set. Can be:
+                - Single number (float/int) to set all boundary points to the same value
+                - 1D numpy array with length matching the boundary dimension
+                - 2D numpy array with shape matching the boundary
+        
+        Raises:
+            ValueError: If boundary name is invalid or values have incompatible shape
+        """
+        boundary = boundary.lower()
+        
+        if boundary not in ['left', 'right', 'top', 'bottom']:
+            raise ValueError("Boundary must be one of: 'left', 'right', 'top', 'bottom'")
+        
+        if isinstance(values, (int, float)):
+            # Convert single value to appropriate array
+            if boundary in ['left', 'right']:
+                values = np.full(self._shape[0], values, dtype=self._dtype)
+            else:  # top, bottom
+                values = np.full(self._shape[1], values, dtype=self._dtype)
+        
+        if not isinstance(values, np.ndarray):
+            raise TypeError("Values must be a number or numpy array")
+        
+        # Validate and set boundary values
+        if boundary == 'left':
+            if values.shape != (self._shape[0],):
+                raise ValueError(f"Left boundary values must have shape ({self._shape[0]},), got {values.shape}")
+            self._state[:, 0] = values
+        elif boundary == 'right':
+            if values.shape != (self._shape[0],):
+                raise ValueError(f"Right boundary values must have shape ({self._shape[0]},), got {values.shape}")
+            self._state[:, -1] = values
+        elif boundary == 'top':
+            if values.shape != (self._shape[1],):
+                raise ValueError(f"Top boundary values must have shape ({self._shape[1]},), got {values.shape}")
+            self._state[0, :] = values
+        elif boundary == 'bottom':
+            if values.shape != (self._shape[1],):
+                raise ValueError(f"Bottom boundary values must have shape ({self._shape[1]},), got {values.shape}")
+            self._state[-1, :] = values
     
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
