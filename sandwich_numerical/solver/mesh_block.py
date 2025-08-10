@@ -1,5 +1,14 @@
 import numpy as np
 from typing import Union
+from enum import Enum
+
+
+class BoundaryType(Enum):
+    """Enumeration of valid boundary types for the mesh block."""
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
 
 
 class MeshBlock:
@@ -78,12 +87,12 @@ class MeshBlock:
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
     
-    def _preprocess_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> np.ndarray:
+    def _preprocess_boundary_values(self, boundary: Union[str, BoundaryType], values: Union[np.ndarray, float, int]) -> np.ndarray:
         """
         Preprocess boundary values to ensure they are in the correct format.
         
         Args:
-            boundary: Boundary to update ('left', 'right', 'top', 'bottom')
+            boundary: Boundary to update (can be string or BoundaryType enum)
             values: Values to set. Can be:
                 - Single number (float/int) to set all boundary points to the same value
                 - 1D numpy array with length matching the boundary dimension
@@ -96,16 +105,19 @@ class MeshBlock:
             ValueError: If boundary name is invalid or values have incompatible shape
             TypeError: If values are not a number or numpy array
         """
-        boundary = boundary.lower()
-        
-        if boundary not in ['left', 'right', 'top', 'bottom']:
-            raise ValueError("Boundary must be one of: 'left', 'right', 'top', 'bottom'")
+        # Convert string to enum if needed
+        if isinstance(boundary, str):
+            try:
+                boundary = BoundaryType(boundary.lower())
+            except ValueError:
+                valid_boundaries = [b.value for b in BoundaryType]
+                raise ValueError(f"Boundary must be one of: {valid_boundaries}")
         
         if isinstance(values, (int, float)):
             # Convert single value to appropriate array
-            if boundary in ['left', 'right']:
+            if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
                 values = np.full(self._shape[0], values, dtype=self._dtype)
-            else:  # top, bottom
+            else:  # TOP, BOTTOM
                 values = np.full(self._shape[1], values, dtype=self._dtype)
         
         if not isinstance(values, np.ndarray):
@@ -113,12 +125,12 @@ class MeshBlock:
         
         return values
 
-    def set_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> None:
+    def set_boundary_values(self, boundary: Union[str, BoundaryType], values: Union[np.ndarray, float, int]) -> None:
         """
         Update boundary values of the mesh block.
         
         Args:
-            boundary: Boundary to update ('left', 'right', 'top', 'bottom')
+            boundary: Boundary to update (can be string or BoundaryType enum)
             values: Values to set. Can be:
                 - Single number (float/int) to set all boundary points to the same value
                 - 1D numpy array with length matching the boundary dimension
@@ -130,23 +142,27 @@ class MeshBlock:
         # Preprocess the values to ensure correct format
         preprocessed_values = self._preprocess_boundary_values(boundary, values)
         
+        # Get the boundary enum for comparison
+        if isinstance(boundary, str):
+            boundary = BoundaryType(boundary.lower())
+        
         # Validate and set boundary values
-        if boundary == 'left':
+        if boundary == BoundaryType.LEFT:
             if preprocessed_values.shape != (self._shape[0],):
                 raise ValueError(f"Left boundary values must have shape ({self._shape[0]},), got {preprocessed_values.shape}")
-            self._state[:, 0] = values
-        elif boundary == 'right':
+            self._state[:, 0] = preprocessed_values
+        elif boundary == BoundaryType.RIGHT:
             if preprocessed_values.shape != (self._shape[0],):
                 raise ValueError(f"Right boundary values must have shape ({self._shape[0]},), got {preprocessed_values.shape}")
-            self._state[:, -1] = values
-        elif boundary == 'top':
+            self._state[:, -1] = preprocessed_values
+        elif boundary == BoundaryType.TOP:
             if preprocessed_values.shape != (self._shape[1],):
                 raise ValueError(f"Top boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
-            self._state[0, :] = values
-        elif boundary == 'bottom':
+            self._state[0, :] = preprocessed_values
+        elif boundary == BoundaryType.BOTTOM:
             if preprocessed_values.shape != (self._shape[1],):
                 raise ValueError(f"Bottom boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
-            self._state[-1, :] = values
+            self._state[-1, :] = preprocessed_values
     
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
