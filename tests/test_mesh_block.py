@@ -206,6 +206,61 @@ class TestMeshBlock:
         
         with pytest.raises(TypeError):
             sample_block.get_boundary_values('center')
+    
+    def test_get_boundary_gradients(self):
+        """Test getting boundary gradients for all boundary types."""
+        # Create a 3x3 mesh block with known values
+        mesh = MeshBlock((3, 3))
+        # Set up a simple test pattern
+        test_state = np.array([
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0]
+        ])
+        mesh.set_state(test_state)
+        
+        # Test top gradient: top line - adjacent line below
+        top_grad = mesh.get_boundary_gradients(BoundaryType.TOP)
+        expected_top = np.array([1.0, 2.0, 3.0]) - np.array([4.0, 5.0, 6.0])
+        np.testing.assert_array_equal(top_grad, expected_top)
+        
+        # Test bottom gradient: line adjacent to bottom - bottom line
+        bottom_grad = mesh.get_boundary_gradients(BoundaryType.BOTTOM)
+        expected_bottom = np.array([4.0, 5.0, 6.0]) - np.array([7.0, 8.0, 9.0])
+        np.testing.assert_array_equal(bottom_grad, expected_bottom)
+        
+        # Test left gradient: line adjacent to left - left line
+        left_grad = mesh.get_boundary_gradients(BoundaryType.LEFT)
+        expected_left = np.array([2.0, 5.0, 8.0]) - np.array([1.0, 4.0, 7.0])
+        np.testing.assert_array_equal(left_grad, expected_left)
+        
+        # Test right gradient: right line - line adjacent to right
+        right_grad = mesh.get_boundary_gradients(BoundaryType.RIGHT)
+        expected_right = np.array([3.0, 6.0, 9.0]) - np.array([2.0, 5.0, 8.0])
+        np.testing.assert_array_equal(right_grad, expected_right)
+    
+    def test_get_all_boundary_gradients(self):
+        """Test getting all boundary gradients at once."""
+        mesh = MeshBlock((2, 2))
+        test_state = np.array([
+            [1.0, 2.0],
+            [3.0, 4.0]
+        ])
+        mesh.set_state(test_state)
+        
+        all_grads = mesh.get_all_boundary_gradients()
+        
+        # Verify all boundaries are present
+        assert BoundaryType.TOP in all_grads
+        assert BoundaryType.BOTTOM in all_grads
+        assert BoundaryType.LEFT in all_grads
+        assert BoundaryType.RIGHT in all_grads
+        
+        # Verify the gradients are computed correctly
+        np.testing.assert_array_equal(all_grads[BoundaryType.TOP], np.array([1.0, 2.0]) - np.array([3.0, 4.0]))
+        np.testing.assert_array_equal(all_grads[BoundaryType.BOTTOM], np.array([1.0, 2.0]) - np.array([3.0, 4.0]))
+        np.testing.assert_array_equal(all_grads[BoundaryType.LEFT], np.array([2.0, 4.0]) - np.array([1.0, 3.0]))
+        np.testing.assert_array_equal(all_grads[BoundaryType.RIGHT], np.array([2.0, 4.0]) - np.array([1.0, 3.0]))
 
 
 if __name__ == "__main__":

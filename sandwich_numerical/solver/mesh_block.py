@@ -188,6 +188,69 @@ class MeshBlock:
             valid_boundaries = [b.value for b in BoundaryType]
             raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
+    def get_boundary_gradients(self, boundary: BoundaryType) -> np.ndarray:
+        """
+        Get boundary gradients from the mesh block.
+        
+        The gradients are computed as:
+        - Top gradient: "top line" - "adjacent line below"
+        - Bottom gradient: "line adjacent to the bottom one" - "bottom line"
+        - Left gradient: "line adjacent to the left line" - "left line"
+        - Right gradient: "right line" - "line adjacent to the right line"
+        
+        Args:
+            boundary: Boundary to retrieve gradients for (must be BoundaryType enum)
+            
+        Returns:
+            Numpy array containing the boundary gradients
+            
+        Raises:
+            TypeError: If boundary is not a BoundaryType enum
+            ValueError: If the mesh block is too small to compute gradients
+        """
+        # Validate boundary type
+        if not isinstance(boundary, BoundaryType):
+            raise TypeError(f"boundary must be a BoundaryType enum, got {type(boundary).__name__}")
+        
+        # Check if the mesh block is large enough to compute gradients
+        if self._shape[0] < 2 or self._shape[1] < 2:
+            raise ValueError("Mesh block must be at least 2x2 to compute gradients")
+        
+        # Compute gradients based on boundary type
+        if boundary == BoundaryType.TOP:
+            # Top gradient: top line - adjacent line below
+            return self._state[0, :] - self._state[1, :]
+        elif boundary == BoundaryType.BOTTOM:
+            # Bottom gradient: line adjacent to bottom - bottom line
+            return self._state[-2, :] - self._state[-1, :]
+        elif boundary == BoundaryType.LEFT:
+            # Left gradient: line adjacent to left - left line
+            return self._state[:, 1] - self._state[:, 0]
+        elif boundary == BoundaryType.RIGHT:
+            # Right gradient: right line - line adjacent to right
+            return self._state[:, -1] - self._state[:, -2]
+        else:
+            # This should never happen due to the enum validation above
+            valid_boundaries = [b.value for b in BoundaryType]
+            raise ValueError(f"Boundary must be one of: {valid_boundaries}")
+    
+    def get_all_boundary_gradients(self) -> dict:
+        """
+        Get gradients for all boundaries at once.
+        
+        Returns:
+            Dictionary mapping BoundaryType to gradient arrays
+            
+        Raises:
+            ValueError: If the mesh block is too small to compute gradients
+        """
+        return {
+            BoundaryType.TOP: self.get_boundary_gradients(BoundaryType.TOP),
+            BoundaryType.BOTTOM: self.get_boundary_gradients(BoundaryType.BOTTOM),
+            BoundaryType.LEFT: self.get_boundary_gradients(BoundaryType.LEFT),
+            BoundaryType.RIGHT: self.get_boundary_gradients(BoundaryType.RIGHT)
+        }
+    
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
         return f"MeshBlock(shape={self._shape}, dtype={self._dtype})"
