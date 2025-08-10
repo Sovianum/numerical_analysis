@@ -12,6 +12,7 @@ This project contains Python implementations of numerical analysis methods, spec
   - `test_sandwich.py` - Comprehensive pytest test suite
 - `notebooks/` - Jupyter notebooks directory
   - `Sandwich.ipynb` - Original Jupyter notebook (for reference)
+- `sandwich.py` - Root-level implementation with utility functions
 - `pyproject.toml` - Poetry configuration and dependencies
 - `README.md` - This documentation file
 
@@ -95,7 +96,13 @@ The main class that implements the numerical solver:
 - `get_residual()` - Calculate the current residual (error)
 - `get_displacement_array()` - Get the combined displacement data
 
-### Helper Functions
+### Core Functions
+
+- `set_laplace_update()` - Apply Laplace operator for numerical integration
+- `set_boundary_conditions_*_block()` - Set boundary conditions for each block type
+- `transfer_data_inwards()` / `transfer_data_outwards()` - Handle data transfer between blocks
+
+### Utility Functions (in root sandwich.py)
 
 - `process_mesh()` - Run multiple iterations and track residuals
 - `get_samples_df()` - Extract statistical data from the mesh
@@ -104,13 +111,12 @@ The main class that implements the numerical solver:
 
 ## Testing
 
-The project includes a comprehensive test suite with **99% code coverage**:
+The project includes a comprehensive test suite:
 
 ### Test Coverage
 
 - **TestSandwich**: Tests for basic object creation, state arrays, and step methods
-- **TestProcessMesh**: Tests for mesh processing and iteration functionality
-- **TestUtilityFunctions**: Tests for utility functions and data conversion
+- **TestSandwich**: Tests for displacement arrays and plotting functionality
 
 ### Running Tests Locally
 
@@ -131,11 +137,10 @@ This project uses GitHub Actions for automated testing on every commit:
 ### GitHub Actions Workflows
 
 - **`.github/workflows/test.yml`** - Full workflow with coverage reporting and Codecov integration
-- **`.github/workflows/test-simple.yml`** - Simple workflow without coverage (faster builds)
 
 ### CI Features
 
-- **Multi-Python Testing**: Tests against Python 3.10, 3.11, and 3.12
+- **Python Testing**: Tests against Python 3.11
 - **Automatic Triggering**: Runs on every push and pull request
 - **Dependency Caching**: Fast builds with Poetry virtual environment caching
 - **Coverage Reporting**: Generates coverage reports for quality monitoring
@@ -206,12 +211,11 @@ numerical_analysis/
 │   ├── __init__.py              # Tests package
 │   └── test_sandwich.py         # Comprehensive pytest tests
 ├── notebooks/                   # Jupyter notebooks
-│   ├── Sandwich.ipynb           # Original Jupyter notebook
-│   └── .ipynb_checkpoints/      # Jupyter checkpoints
+│   └── Sandwich.ipynb           # Original Jupyter notebook
 ├── .github/                     # GitHub configuration
 │   └── workflows/               # GitHub Actions workflows
-│       ├── test.yml             # Full CI workflow
-│       └── test-simple.yml      # Simple CI workflow
+│       └── test.yml             # CI workflow with coverage
+├── sandwich.py                  # Root-level implementation with utilities
 ├── pyproject.toml               # Poetry configuration
 └── README.md                    # This file
 ```
