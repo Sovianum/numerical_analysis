@@ -4,7 +4,7 @@ Tests for the Sandwich numerical analysis package.
 
 import pytest
 import numpy as np
-from sandwich_numerical import Sandwich
+from sandwich_numerical.sandwich import Sandwich
 
 
 class TestSandwich:

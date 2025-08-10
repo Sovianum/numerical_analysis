@@ -363,7 +363,7 @@ class Sandwich:
         set_boundary_conditions_top_block(
             self.curr_state_top, 
             self.next_state_top, 
-            self.grad_vec[2*self.block_height:], 
+            self.grad_vec[2*self.block_height:3*self.block_height], 
             self.grid_step
         )
         
