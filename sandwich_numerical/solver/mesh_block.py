@@ -78,9 +78,9 @@ class MeshBlock:
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
     
-    def set_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> None:
+    def _preprocess_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> np.ndarray:
         """
-        Update boundary values of the mesh block.
+        Preprocess boundary values to ensure they are in the correct format.
         
         Args:
             boundary: Boundary to update ('left', 'right', 'top', 'bottom')
@@ -89,8 +89,12 @@ class MeshBlock:
                 - 1D numpy array with length matching the boundary dimension
                 - 2D numpy array with shape matching the boundary
         
+        Returns:
+            Preprocessed numpy array with correct shape and dtype
+            
         Raises:
             ValueError: If boundary name is invalid or values have incompatible shape
+            TypeError: If values are not a number or numpy array
         """
         boundary = boundary.lower()
         
@@ -107,22 +111,41 @@ class MeshBlock:
         if not isinstance(values, np.ndarray):
             raise TypeError("Values must be a number or numpy array")
         
+        return values
+
+    def set_boundary_values(self, boundary: str, values: Union[np.ndarray, float, int]) -> None:
+        """
+        Update boundary values of the mesh block.
+        
+        Args:
+            boundary: Boundary to update ('left', 'right', 'top', 'bottom')
+            values: Values to set. Can be:
+                - Single number (float/int) to set all boundary points to the same value
+                - 1D numpy array with length matching the boundary dimension
+                - 2D numpy array with shape matching the boundary
+        
+        Raises:
+            ValueError: If boundary name is invalid or values have incompatible shape
+        """
+        # Preprocess the values to ensure correct format
+        preprocessed_values = self._preprocess_boundary_values(boundary, values)
+        
         # Validate and set boundary values
         if boundary == 'left':
-            if values.shape != (self._shape[0],):
-                raise ValueError(f"Left boundary values must have shape ({self._shape[0]},), got {values.shape}")
+            if preprocessed_values.shape != (self._shape[0],):
+                raise ValueError(f"Left boundary values must have shape ({self._shape[0]},), got {preprocessed_values.shape}")
             self._state[:, 0] = values
         elif boundary == 'right':
-            if values.shape != (self._shape[0],):
-                raise ValueError(f"Right boundary values must have shape ({self._shape[0]},), got {values.shape}")
+            if preprocessed_values.shape != (self._shape[0],):
+                raise ValueError(f"Right boundary values must have shape ({self._shape[0]},), got {preprocessed_values.shape}")
             self._state[:, -1] = values
         elif boundary == 'top':
-            if values.shape != (self._shape[1],):
-                raise ValueError(f"Top boundary values must have shape ({self._shape[1]},), got {values.shape}")
+            if preprocessed_values.shape != (self._shape[1],):
+                raise ValueError(f"Top boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
             self._state[0, :] = values
         elif boundary == 'bottom':
-            if values.shape != (self._shape[1],):
-                raise ValueError(f"Bottom boundary values must have shape ({self._shape[1]},), got {values.shape}")
+            if preprocessed_values.shape != (self._shape[1],):
+                raise ValueError(f"Bottom boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
             self._state[-1, :] = values
     
     def __repr__(self) -> str:
