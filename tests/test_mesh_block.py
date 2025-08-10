@@ -106,13 +106,14 @@ class TestMeshBlock:
     
     def test_set_boundary_values_with_invalid_boundary(self, sample_block):
         """Test that set_boundary_values fails with invalid boundary names."""
-        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
+        # Test with invalid enum values (this should raise TypeError)
+        with pytest.raises(TypeError):
             sample_block.set_boundary_values('invalid', 1.0)
         
-        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
+        with pytest.raises(TypeError):
             sample_block.set_boundary_values('center', 1.0)
         
-        with pytest.raises(ValueError, match="Boundary must be one of: \\['left', 'right', 'top', 'bottom'\\]"):
+        with pytest.raises(TypeError):
             sample_block.set_boundary_values('', 1.0)
     
     def test_boundary_values_with_different_dtypes(self, sample_block):
@@ -151,6 +152,60 @@ class TestMeshBlock:
                             [30.0, 0.0, 0.0, 0.0]])
         
         assert np.array_equal(sample_block.state, expected)
+    
+    def test_get_boundary_values(self, sample_block):
+        """Test getting boundary values from the mesh block."""
+        # Set some boundary values first
+        sample_block.set_boundary_values(BoundaryType.LEFT, 1.0)
+        sample_block.set_boundary_values(BoundaryType.RIGHT, 2.0)
+        sample_block.set_boundary_values(BoundaryType.TOP, 3.0)
+        sample_block.set_boundary_values(BoundaryType.BOTTOM, 4.0)
+        
+        # Test getting left boundary values (note: TOP overwrites first row)
+        left_values = sample_block.get_boundary_values(BoundaryType.LEFT)
+        assert left_values.shape == (3,)
+        assert np.array_equal(left_values, np.array([3.0, 1.0, 4.0]))  # TOP, LEFT, BOTTOM
+        
+        # Test getting right boundary values (note: TOP and BOTTOM overwrite first/last rows)
+        right_values = sample_block.get_boundary_values(BoundaryType.RIGHT)
+        assert right_values.shape == (3,)
+        assert np.array_equal(right_values, np.array([3.0, 2.0, 4.0]))  # TOP, RIGHT, BOTTOM
+        
+        # Test getting top boundary values
+        top_values = sample_block.get_boundary_values(BoundaryType.TOP)
+        assert top_values.shape == (4,)
+        assert np.array_equal(top_values, np.array([3.0, 3.0, 3.0, 3.0]))
+        
+        # Test getting bottom boundary values
+        bottom_values = sample_block.get_boundary_values(BoundaryType.BOTTOM)
+        assert bottom_values.shape == (4,)
+        assert np.array_equal(bottom_values, np.array([4.0, 4.0, 4.0, 4.0]))
+        
+        # Test that returned arrays are copies, not views
+        left_values[0] = 999.0
+        assert sample_block.get_boundary_values(BoundaryType.LEFT)[0] == 3.0  # Original unchanged
+    
+    def test_get_boundary_values_with_enum_values(self, sample_block):
+        """Test getting boundary values using enum values."""
+        # Set boundary values
+        sample_block.set_boundary_values(BoundaryType.LEFT, 5.0)
+        sample_block.set_boundary_values(BoundaryType.TOP, 10.0)
+        
+        # Test getting with enum values (note: TOP overwrites first row of LEFT)
+        left_values = sample_block.get_boundary_values(BoundaryType.LEFT)
+        assert np.array_equal(left_values, np.array([10.0, 5.0, 5.0]))  # TOP, LEFT, LEFT
+        
+        top_values = sample_block.get_boundary_values(BoundaryType.TOP)
+        assert np.array_equal(top_values, np.array([10.0, 10.0, 10.0, 10.0]))
+    
+    def test_get_boundary_values_with_invalid_boundary(self, sample_block):
+        """Test that get_boundary_values fails with invalid boundary names."""
+        # Test with invalid enum values (this should raise TypeError)
+        with pytest.raises(TypeError):
+            sample_block.get_boundary_values('invalid')
+        
+        with pytest.raises(TypeError):
+            sample_block.get_boundary_values('center')
 
 
 if __name__ == "__main__":
