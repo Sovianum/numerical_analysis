@@ -275,25 +275,25 @@ class TestMeshBlock:
         bottom_grad = mesh.get_boundary_gradients(BoundaryType.BOTTOM)
         np.testing.assert_array_equal(bottom_grad, np.array([0.5, 1.0, 1.5]))
     
-    def test_shadow_state_initialization(self, sample_block):
-        """Test that shadow state is properly initialized."""
-        assert sample_block.shadow_state.shape == (3, 4)
-        assert sample_block.shadow_state.dtype == np.float64
-        assert np.all(sample_block.shadow_state == 0.0)
-        assert sample_block.shadow_state is not sample_block._shadow_state  # Should be a view
+    def test_next_state_initialization(self, sample_block):
+        """Test that next state is properly initialized."""
+        assert sample_block.next_state.shape == (3, 4)
+        assert sample_block.next_state.dtype == np.float64
+        assert np.all(sample_block.next_state == 0.0)
+        assert sample_block.next_state is not sample_block._next_state  # Should be a view
     
-    def test_set_shadow_state(self, sample_block):
-        """Test setting shadow state with a valid numpy array."""
-        new_shadow_state = np.array([[10.0, 20.0, 30.0, 40.0],
+    def test_set_next_state(self, sample_block):
+        """Test setting next state with a valid numpy array."""
+        new_next_state = np.array([[10.0, 20.0, 30.0, 40.0],
                                      [50.0, 60.0, 70.0, 80.0],
                                      [90.0, 100.0, 110.0, 120.0]])
         
-        sample_block.set_shadow_state(new_shadow_state)
+        sample_block.set_next_state(new_next_state)
         
-        # Check that the shadow state was updated
-        assert np.array_equal(sample_block.shadow_state, new_shadow_state)
+        # Check that the next state was updated
+        assert np.array_equal(sample_block.next_state, new_next_state)
         # Check that it's the same array (in-place update)
-        assert sample_block.shadow_state is not new_shadow_state
+        assert sample_block.next_state is not new_next_state
     
     def test_apply_method(self, sample_block):
         """Test the apply method with a callable function."""
@@ -301,25 +301,25 @@ class TestMeshBlock:
         sample_block.set_state(np.array([[1.0, 2.0, 3.0, 4.0],
                                          [5.0, 6.0, 7.0, 8.0],
                                          [9.0, 10.0, 11.0, 12.0]]))
-        sample_block.set_shadow_state(np.array([[100.0, 200.0, 300.0, 400.0],
+        sample_block.set_next_state(np.array([[100.0, 200.0, 300.0, 400.0],
                                                [500.0, 600.0, 700.0, 800.0],
                                                [900.0, 1000.0, 1100.0, 1200.0]]))
         
-        # Define a function that returns a copy of shadow state
-        def copy_shadow_to_main(state, shadow_state):
-            return shadow_state.copy()
+        # Define a function that returns a copy of next state
+        def copy_next_to_main(state, next_state):
+            return next_state.copy()
         
                 # Apply the function
-        sample_block.apply(copy_shadow_to_main)
+        sample_block.apply(copy_next_to_main)
         
-        # Check that the main state was updated with shadow state values
+        # Check that the main state was updated with next state values
         expected_state = np.array([[100.0, 200.0, 300.0, 400.0],
                                    [500.0, 600.0, 700.0, 800.0],
                                    [900.0, 1000.0, 1100.0, 1200.0]])
         assert np.array_equal(sample_block.state, expected_state)
         
-        # Check that shadow state remains unchanged
-        assert np.array_equal(sample_block.shadow_state, expected_state)
+        # Check that next state remains unchanged
+        assert np.array_equal(sample_block.next_state, expected_state)
     
     def test_apply_method_with_modification(self, sample_block):
         """Test the apply method with a function that modifies both states."""

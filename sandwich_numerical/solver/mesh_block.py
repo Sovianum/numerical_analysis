@@ -34,7 +34,7 @@ class MeshBlock:
             raise ValueError("Shape must be 2-dimensional (height, width)")
         
         self._state = np.zeros(shape, dtype=dtype)
-        self._shadow_state = np.zeros(shape, dtype=dtype)
+        self._next_state = np.zeros(shape, dtype=dtype)
         self._shape = shape
         self._dtype = dtype
     
@@ -49,14 +49,14 @@ class MeshBlock:
         return self._state.view()
     
     @property
-    def shadow_state(self) -> np.ndarray:
+    def next_state(self) -> np.ndarray:
         """
-        Get the current shadow state array.
+        Get the current next state array.
         
         Returns:
-            The current shadow state array (read-only view)
+            The current next state array (read-only view)
         """
-        return self._shadow_state.view()
+        return self._next_state.view()
     
     @property
     def shape(self) -> tuple:
@@ -98,12 +98,12 @@ class MeshBlock:
         # This will automatically handle dtype conversion if needed
         np.copyto(self._state, new_state)
     
-    def set_shadow_state(self, new_state: np.ndarray) -> None:
+    def set_next_state(self, new_state: np.ndarray) -> None:
         """
-        Update the shadow state array in-place with new values.
+        Update the next state array in-place with new values.
         
         Args:
-            new_state: New state array to copy into the shadow state
+            new_state: New state array to copy into the next state
             
         Raises:
             ValueError: If the new state has incompatible shape
@@ -114,9 +114,9 @@ class MeshBlock:
         if new_state.shape != self._shape:
             raise ValueError(f"Shape mismatch: expected {self._shape}, got {new_state.shape}")
         
-        # Copy the new state into the existing shadow array (in-place update)
+        # Copy the new state into the existing next array (in-place update)
         # This will automatically handle dtype conversion if needed
-        np.copyto(self._shadow_state, new_state)
+        np.copyto(self._next_state, new_state)
     
     def _preprocess_boundary_values(self, boundary: BoundaryType, values: Union[np.ndarray, float, int]) -> np.ndarray:
         """
@@ -360,24 +360,24 @@ class MeshBlock:
     
     def apply(self, func: Callable[[np.ndarray, np.ndarray], np.ndarray]) -> None:
         """
-        Apply a callable function that uses both the main state and shadow state.
+        Apply a callable function that uses both the main state and next state.
         
         Args:
-            func: A callable that takes (state, shadow_state) as arguments and returns the new state
+            func: A callable that takes (state, next_state) as arguments and returns the new state
         """
-        new_state = func(self._state, self._shadow_state)
+        new_state = func(self._state, self._next_state)
         self._state = new_state
     
     def swap(self) -> None:
         """
-        Swap the main state with the shadow state.
+        Swap the main state with the next state.
         """
-        self._state, self._shadow_state = self._shadow_state, self._state
+        self._state, self._next_state = self._next_state, self._state
     
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
         return f"MeshBlock(shape={self._shape}, dtype={self._dtype})"
     
     def __str__(self) -> str:
-        """String representation showing the current state and shadow state."""
-        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}\nShadow State:\n{self._shadow_state}" 
+        """String representation showing the current state and next state."""
+        return f"MeshBlock(shape={self._shape})\nState:\n{self._state}\nNext State:\n{self._next_state}" 
