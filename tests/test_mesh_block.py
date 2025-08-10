@@ -238,30 +238,42 @@ class TestMeshBlock:
         right_grad = mesh.get_boundary_gradients(BoundaryType.RIGHT)
         expected_right = np.array([3.0, 6.0, 9.0]) - np.array([2.0, 5.0, 8.0])
         np.testing.assert_array_equal(right_grad, expected_right)
-    
-    def test_get_all_boundary_gradients(self):
-        """Test getting all boundary gradients at once."""
-        mesh = MeshBlock((2, 2))
+
+    def test_set_boundary_gradients(self):
+        """Test setting boundary gradients by modifying boundary values."""
+        # Create a 3x3 mesh block with known values
+        mesh = MeshBlock((3, 3))
         test_state = np.array([
-            [1.0, 2.0],
-            [3.0, 4.0]
+            [1.0, 2.0, 3.0],
+            [4.0, 5.0, 6.0],
+            [7.0, 8.0, 9.0]
         ])
         mesh.set_state(test_state)
         
-        all_grads = mesh.get_all_boundary_gradients()
+        # Test setting top gradient
+        mesh.set_boundary_gradients(BoundaryType.TOP, 2.0)
+        top_grad = mesh.get_boundary_gradients(BoundaryType.TOP)
+        np.testing.assert_array_equal(top_grad, np.array([2.0, 2.0, 2.0]))
         
-        # Verify all boundaries are present
-        assert BoundaryType.TOP in all_grads
-        assert BoundaryType.BOTTOM in all_grads
-        assert BoundaryType.LEFT in all_grads
-        assert BoundaryType.RIGHT in all_grads
+        # Verify that only boundary values changed
+        assert mesh.state[1, 0] == 4.0  # Adjacent line unchanged
+        assert mesh.state[1, 1] == 5.0  # Adjacent line unchanged
+        assert mesh.state[1, 2] == 6.0  # Adjacent line unchanged
         
-        # Verify the gradients are computed correctly
-        np.testing.assert_array_equal(all_grads[BoundaryType.TOP], np.array([1.0, 2.0]) - np.array([3.0, 4.0]))
-        np.testing.assert_array_equal(all_grads[BoundaryType.BOTTOM], np.array([1.0, 2.0]) - np.array([3.0, 4.0]))
-        np.testing.assert_array_equal(all_grads[BoundaryType.LEFT], np.array([2.0, 4.0]) - np.array([1.0, 3.0]))
-        np.testing.assert_array_equal(all_grads[BoundaryType.RIGHT], np.array([2.0, 4.0]) - np.array([1.0, 3.0]))
-
-
+        # Test setting left gradient with array
+        mesh.set_boundary_gradients(BoundaryType.LEFT, np.array([1.0, 2.0, 3.0]))
+        left_grad = mesh.get_boundary_gradients(BoundaryType.LEFT)
+        np.testing.assert_array_equal(left_grad, np.array([1.0, 2.0, 3.0]))
+        
+        # Test setting right gradient
+        mesh.set_boundary_gradients(BoundaryType.RIGHT, -1.0)
+        right_grad = mesh.get_boundary_gradients(BoundaryType.RIGHT)
+        np.testing.assert_array_equal(right_grad, np.array([-1.0, -1.0, -1.0]))
+        
+        # Test setting bottom gradient
+        mesh.set_boundary_gradients(BoundaryType.BOTTOM, np.array([0.5, 1.0, 1.5]))
+        bottom_grad = mesh.get_boundary_gradients(BoundaryType.BOTTOM)
+        np.testing.assert_array_equal(bottom_grad, np.array([0.5, 1.0, 1.5]))
+    
 if __name__ == "__main__":
     pytest.main([__file__]) 

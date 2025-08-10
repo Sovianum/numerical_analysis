@@ -234,22 +234,98 @@ class MeshBlock:
             valid_boundaries = [b.value for b in BoundaryType]
             raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
-    def get_all_boundary_gradients(self) -> dict:
+    def _preprocess_gradients(self, boundary: BoundaryType, gradients: Union[np.ndarray, float, int]) -> np.ndarray:
         """
-        Get gradients for all boundaries at once.
+        Preprocess gradients to ensure correct format and validate shape.
         
+        Args:
+            boundary: Boundary type to determine expected shape
+            gradients: Input gradients (can be number or numpy array)
+            
         Returns:
-            Dictionary mapping BoundaryType to gradient arrays
+            Preprocessed numpy array with correct shape and dtype
             
         Raises:
-            ValueError: If the mesh block is too small to compute gradients
+            TypeError: If gradients is not a number or numpy array
+            ValueError: If gradients have incompatible shape
         """
-        return {
-            BoundaryType.TOP: self.get_boundary_gradients(BoundaryType.TOP),
-            BoundaryType.BOTTOM: self.get_boundary_gradients(BoundaryType.BOTTOM),
-            BoundaryType.LEFT: self.get_boundary_gradients(BoundaryType.LEFT),
-            BoundaryType.RIGHT: self.get_boundary_gradients(BoundaryType.RIGHT)
-        }
+        gradients_array = gradients
+        if isinstance(gradients, (int, float)):
+            if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
+                gradients_array = np.full(self._shape[0], gradients, dtype=self._dtype)
+            else:  # TOP, BOTTOM
+                gradients_array = np.full(self._shape[1], gradients, dtype=self._dtype)
+        elif isinstance(gradients, np.ndarray):
+            gradients_array = gradients
+        else:
+            raise TypeError("gradients must be a number or numpy array")
+        
+        # Validate gradient shape
+        if boundary in [BoundaryType.LEFT, BoundaryType.RIGHT]:
+            if gradients_array.shape != (self._shape[0],):
+                raise ValueError(f"Left/Right boundary gradients must have shape ({self._shape[0]},), got {gradients_array.shape}")
+        else:  # TOP, BOTTOM
+            if gradients_array.shape != (self._shape[1],):
+                raise ValueError(f"Top/Bottom boundary gradients must have shape ({self._shape[1]},), got {gradients_array.shape}")
+        
+        return gradients_array
+
+    def set_boundary_gradients(self, boundary: BoundaryType, gradients: Union[np.ndarray, float, int]) -> None:
+        """
+        Set boundary gradients by modifying only the boundary values.
+        
+        This method works backwards from the desired gradient to determine what boundary
+        values need to be set. It preserves the adjacent interior values and adjusts
+        only the boundary values to achieve the specified gradients.
+        
+        The gradients are set as:
+        - Top gradient: "top line" - "adjacent line below" → adjusts top line
+        - Bottom gradient: "line adjacent to bottom" - "bottom line" → adjusts bottom line
+        - Left gradient: "line adjacent to left" - "left line" → adjusts left line
+        - Right gradient: "right line" - "line adjacent to right" → adjusts right line
+        
+        Args:
+            boundary: Boundary to update (must be BoundaryType enum)
+            gradients: Desired gradients. Can be:
+                - Single number (float/int) to set all boundary gradients to the same value
+                - 1D numpy array with length matching the boundary dimension
+        
+        Raises:
+            TypeError: If boundary is not a BoundaryType enum
+            ValueError: If the mesh block is too small or gradients have incompatible shape
+        """
+        # Validate boundary type
+        if not isinstance(boundary, BoundaryType):
+            raise TypeError(f"boundary must be a BoundaryType enum, got {type(boundary).__name__}")
+        
+        # Check if the mesh block is large enough to compute gradients
+        if self._shape[0] < 2 or self._shape[1] < 2:
+            raise ValueError("Mesh block must be at least 2x2 to set gradients")
+        
+        # Preprocess the gradients to ensure correct format
+        gradients_array = self._preprocess_gradients(boundary, gradients)
+        
+        # Set boundary values to achieve the desired gradients
+        if boundary == BoundaryType.TOP:
+            # Top gradient: top line - adjacent line below
+            # So: top line = adjacent line below + gradient
+            self._state[0, :] = self._state[1, :] + gradients_array
+        elif boundary == BoundaryType.BOTTOM:
+            # Bottom gradient: line adjacent to bottom - bottom line
+            # So: bottom line = line adjacent to bottom - gradient
+            self._state[-1, :] = self._state[-2, :] - gradients_array
+        elif boundary == BoundaryType.LEFT:
+            # Left gradient: line adjacent to left - left line
+            # So: left line = line adjacent to left - gradient
+            self._state[:, 0] = self._state[:, 1] - gradients_array
+        elif boundary == BoundaryType.RIGHT:
+            # Right gradient: right line - line adjacent to right
+            # So: right line = line adjacent to right + gradient
+            self._state[:, -1] = self._state[:, -2] + gradients_array
+        else:
+            # This should never happen due to the enum validation above
+            valid_boundaries = [b.value for b in BoundaryType]
+            raise ValueError(f"Boundary must be one of: {valid_boundaries}")
     
     def __repr__(self) -> str:
         """String representation of the MeshBlock."""
