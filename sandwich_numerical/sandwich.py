@@ -1,5 +1,5 @@
 import numpy as np
-import plotly.express as px
+import plotly.graph_objects as go
 
 
 def set_laplace_update(curr_state: np.ndarray, next_state: np.ndarray):
@@ -280,7 +280,7 @@ class Sandwich:
         if plot_abs:
             displacement = np.abs(displacement)
         
-        return px.imshow(displacement)
+        return go.Figure(data=go.Heatmap(z=displacement))
     
     def get_displacement_array(self):
         """
