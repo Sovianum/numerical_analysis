@@ -1,6 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
+from sandwich_numerical.solver.mesh_utils import copy_boundary_values
 
 from .solver.laplace import set_laplace_update
 
@@ -108,8 +109,8 @@ def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBloc
     """
     
     # displacements are continuous
-    curr_state_mid.set_boundary_values(BoundaryType.BOTTOM, curr_state_bottom.get_boundary_values(BoundaryType.TOP))
-    curr_state_mid.set_boundary_values(BoundaryType.TOP, curr_state_top.get_boundary_values(BoundaryType.BOTTOM))
+    copy_boundary_values(curr_state_bottom, BoundaryType.TOP, curr_state_mid, BoundaryType.BOTTOM)
+    copy_boundary_values(curr_state_top, BoundaryType.BOTTOM, curr_state_mid, BoundaryType.TOP)
     
     # grads are proportional
     grad_bottom = curr_state_bottom.get_boundary_gradients(BoundaryType.TOP)
@@ -140,8 +141,8 @@ def transfer_data_outwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlo
     """
     
     # displacements are continuous
-    curr_state_bottom.set_boundary_values(BoundaryType.TOP, curr_state_mid.get_boundary_values(BoundaryType.BOTTOM))
-    curr_state_top.set_boundary_values(BoundaryType.BOTTOM, curr_state_mid.get_boundary_values(BoundaryType.TOP))
+    copy_boundary_values(curr_state_mid, BoundaryType.BOTTOM, curr_state_bottom, BoundaryType.TOP)
+    copy_boundary_values(curr_state_mid, BoundaryType.TOP, curr_state_top, BoundaryType.BOTTOM)
     
     # grads are proportional
     grad_bottom = curr_state_mid.get_boundary_gradients(BoundaryType.BOTTOM)
