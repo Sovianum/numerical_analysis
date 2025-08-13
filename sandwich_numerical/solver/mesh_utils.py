@@ -37,14 +37,13 @@ def copy_boundary_gradients(source_block: MeshBlock,
                            source_boundary: BoundaryType,
                            target_block: MeshBlock,
                            target_boundary: BoundaryType,
-                           scaling_factor: float = 1.0,
-                           update_boundary_values: bool = True) -> None:
+                           scaling_factor: float = 1.0) -> None:
     """
     Copy boundary gradients from one mesh block to another.
     
     This function extracts boundary gradients from the source block and applies
-    them to the target block, with optional scaling and offset. The gradients
-    can be applied by either updating boundary values or adjacent interior values.
+    them to the target block, with optional scaling. The gradients are applied
+    by updating boundary values to achieve the desired gradients.
     
     Args:
         source_block (MeshBlock): Source mesh block to copy from
@@ -52,8 +51,6 @@ def copy_boundary_gradients(source_block: MeshBlock,
         source_boundary (BoundaryType): Boundary of source block to copy from
         target_boundary (BoundaryType): Boundary of target block to copy to
         scaling_factor (float): Factor to scale the copied gradients (default: 1.0)
-        update_boundary_values (bool): If True, update boundary values to achieve gradients.
-                                      If False, update adjacent interior values (default: True)
         
     Raises:
         ValueError: If the boundaries have incompatible dimensions or mesh blocks are too small
@@ -71,4 +68,4 @@ def copy_boundary_gradients(source_block: MeshBlock,
     scaled_gradients = source_gradients * scaling_factor
     
     # Set boundary gradients in target block
-    target_block.set_boundary_gradients(target_boundary, scaled_gradients, update_boundary_values)
+    target_block.set_boundary_gradients(target_boundary, scaled_gradients)
