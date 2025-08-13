@@ -164,7 +164,6 @@ class Sandwich:
         self._set_boundary_conditions()
         self._make_laplace_step_outer()
         self._transfer_values_inwards()
-        self._transfer_gradients_inwards()
         self._make_laplace_step_inner()
         self._transfer_gradients_outwards()
         self._swap()
@@ -300,14 +299,6 @@ class Sandwich:
         # displacements are continuous
         copy_boundary_values(self.bottom_next, BoundaryType.TOP, self.mid_next, BoundaryType.BOTTOM)
         copy_boundary_values(self.top_next, BoundaryType.BOTTOM, self.mid_next, BoundaryType.TOP)
-
-    def _transfer_gradients_inwards(self):
-        # grads are proportional
-        grad_bottom = self.bottom_curr.get_boundary_gradients(BoundaryType.TOP)
-        grad_top = self.top_curr.get_boundary_gradients(BoundaryType.BOTTOM)
-        
-        self.mid_curr.set_boundary_gradients(BoundaryType.BOTTOM, grad_bottom * self.grad_factor, update_boundary_values=False)
-        self.mid_curr.set_boundary_gradients(BoundaryType.TOP, grad_top * self.grad_factor, update_boundary_values=False)
 
     def _transfer_gradients_outwards(self):
         # grads are proportional
