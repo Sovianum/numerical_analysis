@@ -79,11 +79,11 @@ def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: Mesh
         The function modifies next_state in-place by setting boundary values.
         The middle block has no zero-gradient conditions on top/bottom sides.
     """
-    
-    next_state._state[:, -1] = 0         # the block is fixed on the far end
+
+    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
     
     # gradients are known on the near end
-    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
+    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
 
 
 def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
