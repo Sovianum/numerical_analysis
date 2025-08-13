@@ -87,8 +87,8 @@ class TestMeshBlock:
         # Note: TOP and BOTTOM overwrite the corners of LEFT and RIGHT
         assert sample_block.state[1, 0] == 5.0   # Left (middle row)
         assert sample_block.state[1, -1] == 10.0  # Right (middle row)
-        assert np.all(sample_block.state[0, :] == 15.0)   # Top (overwrites left/right corners)
-        assert np.all(sample_block.state[-1, :] == 20.0)  # Bottom (overwrites left/right corners)
+        assert np.all(sample_block.state[-1, :] == 15.0)   # Top (overwrites left/right corners)
+        assert np.all(sample_block.state[0, :] == 20.0)  # Bottom (overwrites left/right corners)
     
     def test_set_boundary_values_with_arrays(self, sample_block):
         """Test setting boundary values with numpy arrays."""
@@ -112,14 +112,14 @@ class TestMeshBlock:
         # Bottom row: [11, 12, 13, 14] (overwrites left/right corners)
         
         # Check top row (completely overwritten by TOP)
-        np.testing.assert_array_equal(sample_block.state[0, :], top_values)
+        np.testing.assert_array_equal(sample_block.state[-1, :], top_values)
         
         # Check middle row (LEFT and RIGHT boundaries, not overwritten by TOP/BOTTOM)
         assert sample_block.state[1, 0] == left_values[1]  # Left boundary
         assert sample_block.state[1, -1] == right_values[1]  # Right boundary
         
         # Check bottom row (completely overwritten by BOTTOM)
-        np.testing.assert_array_equal(sample_block.state[-1, :], bottom_values)
+        np.testing.assert_array_equal(sample_block.state[0, :], bottom_values)
     
     def test_boundary_values_with_different_dtypes(self, sample_block):
         """Test setting boundary values with different data types."""
@@ -134,7 +134,7 @@ class TestMeshBlock:
         # Test with numpy arrays of different dtypes
         int_array = np.array([1, 2, 3, 4], dtype=np.int32)  # Must match width (4)
         sample_block.set_boundary_values(BoundaryType.TOP, int_array)
-        assert np.all(sample_block.state[0, :] == [1.0, 2.0, 3.0, 4.0])  # Top row
+        assert np.all(sample_block.state[-1, :] == [1.0, 2.0, 3.0, 4.0])  # Top row
     
     def test_get_boundary_values(self, sample_block):
         """Test getting boundary values."""
@@ -160,8 +160,8 @@ class TestMeshBlock:
         # Check that returned arrays are copies, not views
         assert left_values is not sample_block.state[:, 0]
         assert right_values is not sample_block.state[:, -1]
-        assert top_values is not sample_block.state[0, :]
-        assert bottom_values is not sample_block.state[-1, :]
+        assert top_values is not sample_block.state[-1, :]
+        assert bottom_values is not sample_block.state[0, :]
     
     def test_get_boundary_values_with_enum_values(self, sample_block):
         """Test getting boundary values using enum values."""
@@ -185,10 +185,10 @@ class TestMeshBlock:
         
         # Test gradients
         top_grad = mesh.get_boundary_gradients(BoundaryType.TOP)
-        np.testing.assert_array_equal(top_grad, np.array([-3.0, -3.0, -3.0]))
+        np.testing.assert_array_equal(top_grad, np.array([3.0, 3.0, 3.0]))
         
         bottom_grad = mesh.get_boundary_gradients(BoundaryType.BOTTOM)
-        np.testing.assert_array_equal(bottom_grad, np.array([-3.0, -3.0, -3.0]))
+        np.testing.assert_array_equal(bottom_grad, np.array([3.0, 3.0, 3.0]))
         
         left_grad = mesh.get_boundary_gradients(BoundaryType.LEFT)
         np.testing.assert_array_equal(left_grad, np.array([1.0, 1.0, 1.0]))

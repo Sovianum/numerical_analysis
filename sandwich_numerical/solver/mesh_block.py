@@ -121,11 +121,11 @@ class MeshBlock:
         elif boundary == BoundaryType.TOP:
             if preprocessed_values.shape != (self._shape[1],):
                 raise ValueError(f"Top boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
-            self._state[0, :] = preprocessed_values
+            self._state[-1, :] = preprocessed_values
         elif boundary == BoundaryType.BOTTOM:
             if preprocessed_values.shape != (self._shape[1],):
                 raise ValueError(f"Bottom boundary values must have shape ({self._shape[1]},), got {preprocessed_values.shape}")
-            self._state[-1, :] = preprocessed_values
+            self._state[0, :] = preprocessed_values
     
     def get_boundary_values(self, boundary: BoundaryType) -> np.ndarray:
         """
@@ -150,9 +150,9 @@ class MeshBlock:
         elif boundary == BoundaryType.RIGHT:
             return self._state[:, -1].copy()
         elif boundary == BoundaryType.TOP:
-            return self._state[0, :].copy()
-        elif boundary == BoundaryType.BOTTOM:
             return self._state[-1, :].copy()
+        elif boundary == BoundaryType.BOTTOM:
+            return self._state[0, :].copy()
         else:
             # This should never happen due to the enum validation above
             valid_boundaries = [b.value for b in BoundaryType]
@@ -189,10 +189,10 @@ class MeshBlock:
         # Compute gradients based on boundary type
         if boundary == BoundaryType.TOP:
             # Top gradient: top line - adjacent line below
-            return self._state[0, :] - self._state[1, :]
+            return self._state[-1, :] - self._state[-2, :]
         elif boundary == BoundaryType.BOTTOM:
             # Bottom gradient: line adjacent to bottom - bottom line
-            return self._state[-2, :] - self._state[-1, :]
+            return self._state[1, :] - self._state[0, :]
         elif boundary == BoundaryType.LEFT:
             # Left gradient: line adjacent to left - left line
             return self._state[:, 1] - self._state[:, 0]
@@ -315,11 +315,11 @@ class MeshBlock:
         if boundary == BoundaryType.TOP:
             # Top gradient: top line - adjacent line below
             # So: top line = adjacent line below + gradient
-            self._state[0, :] = self._state[1, :] + gradients_array
+            self._state[-1, :] = self._state[-2, :] + gradients_array
         elif boundary == BoundaryType.BOTTOM:
             # Bottom gradient: line adjacent to bottom - bottom line
             # So: bottom line = line adjacent to bottom - gradient
-            self._state[-1, :] = self._state[-2, :] - gradients_array
+            self._state[0, :] = self._state[1, :] - gradients_array
         elif boundary == BoundaryType.LEFT:
             # Left gradient: line adjacent to left - left line
             # So: left line = line adjacent to left - gradient

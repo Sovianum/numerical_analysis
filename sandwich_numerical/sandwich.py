@@ -1,6 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
-from sandwich_numerical.solver.mesh_block import MeshBlock
+from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
 
 from .solver.laplace import set_laplace_update
 
@@ -24,12 +24,12 @@ def set_boundary_conditions_bottom_block(curr_state: MeshBlock, next_state: Mesh
     Note:
         The function modifies next_state in-place by setting boundary values.
     """
-    
-    next_state._state[:, -1] = 0         # the block is fixed on the far end
-    next_state._state[0] = curr_state._state[1] # df/dx2 = 0 on the bottom side
+
+    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+    next_state.set_boundary_values(BoundaryType.BOTTOM, curr_state._state[1]) # df/dx2 = 0 on the bottom side
     
     # gradients are known on the near end
-    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
+    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
 
 
 def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlock, 
@@ -52,15 +52,12 @@ def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlo
         The function modifies next_state in-place by setting boundary values.
         Assumes both mesh blocks have the same 2D shape.
     """
-
-    assert len(curr_state._state.shape) == 2
-    assert len(next_state._state.shape) == 2
     
-    next_state._state[:, -1] = 0            # the block is fixed on the far end
-    next_state._state[-1] = curr_state._state[-2]  # df/dx2 = 0 on the top side
+    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+    next_state.set_boundary_values(BoundaryType.TOP, curr_state._state[-2]) # df/dx2 = 0 on the top side
     
     # gradients are known on the near end
-    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
+    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
 
 
 def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: MeshBlock,
