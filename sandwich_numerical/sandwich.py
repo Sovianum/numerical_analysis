@@ -5,7 +5,7 @@ from sandwich_numerical.solver.mesh_block import MeshBlock
 from .solver.laplace import set_laplace_update
 
 
-def set_boundary_conditions_bottom_block(curr_state: np.ndarray, next_state: np.ndarray, 
+def set_boundary_conditions_bottom_block(curr_state: MeshBlock, next_state: MeshBlock, 
                                        grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the bottom block of the sandwich structure.
@@ -16,8 +16,8 @@ def set_boundary_conditions_bottom_block(curr_state: np.ndarray, next_state: np.
     3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (np.ndarray): Current state array of shape (n, m)
-        next_state (np.ndarray): Next state array of shape (n, m) to be updated
+        curr_state (MeshBlock): Current state mesh block
+        next_state (MeshBlock): Next state mesh block to be updated
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
@@ -25,14 +25,14 @@ def set_boundary_conditions_bottom_block(curr_state: np.ndarray, next_state: np.
         The function modifies next_state in-place by setting boundary values.
     """
     
-    next_state[:, -1] = 0         # the block is fixed on the far end
-    next_state[0] = curr_state[1] # df/dx2 = 0 on the bottom side
+    next_state._state[:, -1] = 0         # the block is fixed on the far end
+    next_state._state[0] = curr_state._state[1] # df/dx2 = 0 on the bottom side
     
     # gradients are known on the near end
-    next_state[:, 0] = curr_state[:, 1] - grad_vec * grid_step
+    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
 
 
-def set_boundary_conditions_top_block(curr_state: np.ndarray, next_state: np.ndarray, 
+def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlock, 
                                     grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the top block of the sandwich structure.
@@ -43,27 +43,27 @@ def set_boundary_conditions_top_block(curr_state: np.ndarray, next_state: np.nda
     3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (np.ndarray): Current state array of shape (n, m)
-        next_state (np.ndarray): Next state array of shape (n, m) to be updated
+        curr_state (MeshBlock): Current state mesh block
+        next_state (MeshBlock): Next state mesh block to be updated
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
     Note:
         The function modifies next_state in-place by setting boundary values.
-        Assumes both arrays have the same 2D shape.
+        Assumes both mesh blocks have the same 2D shape.
     """
 
-    assert len(curr_state.shape) == 2
-    assert len(next_state.shape) == 2
+    assert len(curr_state._state.shape) == 2
+    assert len(next_state._state.shape) == 2
     
-    next_state[:, -1] = 0            # the block is fixed on the far end
-    next_state[-1] = curr_state[-2]  # df/dx2 = 0 on the top side
+    next_state._state[:, -1] = 0            # the block is fixed on the far end
+    next_state._state[-1] = curr_state._state[-2]  # df/dx2 = 0 on the top side
     
     # gradients are known on the near end
-    next_state[:, 0] = curr_state[:, 1] - grad_vec * grid_step
+    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
 
 
-def set_boundary_conditions_middle_block(curr_state: np.ndarray, next_state: np.ndarray,
+def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: MeshBlock,
                                        grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the middle block of the sandwich structure.
@@ -73,8 +73,8 @@ def set_boundary_conditions_middle_block(curr_state: np.ndarray, next_state: np.
     2. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (np.ndarray): Current state array of shape (n, m)
-        next_state (np.ndarray): Next state array of shape (n, m) to be updated
+        curr_state (MeshBlock): Current state mesh block
+        next_state (MeshBlock): Next state mesh block to be updated
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
@@ -83,13 +83,13 @@ def set_boundary_conditions_middle_block(curr_state: np.ndarray, next_state: np.
         The middle block has no zero-gradient conditions on top/bottom sides.
     """
     
-    next_state[:, -1] = 0         # the block is fixed on the far end
+    next_state._state[:, -1] = 0         # the block is fixed on the far end
     
     # gradients are known on the near end
-    next_state[:, 0] = curr_state[:, 1] - grad_vec * grid_step
+    next_state._state[:, 0] = curr_state._state[:, 1] - grad_vec * grid_step
 
 
-def transfer_data_inwards(curr_state_bottom: np.ndarray, curr_state_top: np.ndarray, curr_state_mid: np.ndarray,
+def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
                               mid_grad_factor: float):
     """
     Transfer displacement and gradient data from outer blocks to the middle block.
@@ -100,9 +100,9 @@ def transfer_data_inwards(curr_state_bottom: np.ndarray, curr_state_top: np.ndar
     2. Gradient proportionality: Gradients are scaled by mid_grad_factor for the middle block
     
     Args:
-        curr_state_bottom (np.ndarray): Current state of the bottom block
-        curr_state_top (np.ndarray): Current state of the top block  
-        curr_state_mid (np.ndarray): Current state of the middle block to be updated
+        curr_state_bottom (MeshBlock): Current state of the bottom block
+        curr_state_top (MeshBlock): Current state of the top block  
+        curr_state_mid (MeshBlock): Current state of the middle block to be updated
         mid_grad_factor (float): Factor to scale gradients in the middle block
         
     Note:
@@ -111,17 +111,17 @@ def transfer_data_inwards(curr_state_bottom: np.ndarray, curr_state_top: np.ndar
     """
     
     # displacements are continuous
-    curr_state_mid[0] = curr_state_bottom[-1]
-    curr_state_mid[-1] = curr_state_top[0]
+    curr_state_mid._state[0] = curr_state_bottom._state[-1]
+    curr_state_mid._state[-1] = curr_state_top._state[0]
     
     # grads are proportional
-    grad_bottom = curr_state_bottom[-1] - curr_state_bottom[-2]
-    grad_top = curr_state_top[1] - curr_state_top[0]
+    grad_bottom = curr_state_bottom._state[-1] - curr_state_bottom._state[-2]
+    grad_top = curr_state_top._state[1] - curr_state_top._state[0]
     
-    curr_state_mid[1] = curr_state_mid[0] + mid_grad_factor * grad_bottom
-    curr_state_mid[-2] = curr_state_mid[-1] - mid_grad_factor * grad_top
+    curr_state_mid._state[1] = curr_state_mid._state[0] + mid_grad_factor * grad_bottom
+    curr_state_mid._state[-2] = curr_state_mid._state[-1] - mid_grad_factor * grad_top
 
-def transfer_data_outwards(curr_state_bottom: np.ndarray, curr_state_top: np.ndarray, curr_state_mid: np.ndarray,
+def transfer_data_outwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
                               mid_grad_factor: float):
     """
     Transfer displacement and gradient data from the middle block to outer blocks.
@@ -132,9 +132,9 @@ def transfer_data_outwards(curr_state_bottom: np.ndarray, curr_state_top: np.nda
     2. Gradient consistency: Gradients are properly scaled back to outer blocks
     
     Args:
-        curr_state_bottom (np.ndarray): Current state of the bottom block to be updated
-        curr_state_top (np.ndarray): Current state of the top block to be updated
-        curr_state_mid (np.ndarray): Current state of the middle block (source)
+        curr_state_bottom (MeshBlock): Current state of the bottom block to be updated
+        curr_state_top (MeshBlock): Current state of the top block to be updated
+        curr_state_mid (MeshBlock): Current state of the middle block (source)
         mid_grad_factor (float): Factor used to scale gradients back to outer blocks
         
     Note:
@@ -143,15 +143,15 @@ def transfer_data_outwards(curr_state_bottom: np.ndarray, curr_state_top: np.nda
     """
     
     # displacements are continuous
-    curr_state_bottom[-1] = curr_state_mid[0]
-    curr_state_top[0] = curr_state_mid[-1]
+    curr_state_bottom._state[-1] = curr_state_mid._state[0]
+    curr_state_top._state[0] = curr_state_mid._state[-1]
     
     # grads are proportional
-    grad_bottom = curr_state_mid[1] - curr_state_mid[0]
-    grad_top = curr_state_mid[-1] - curr_state_mid[-2]
+    grad_bottom = curr_state_mid._state[1] - curr_state_mid._state[0]
+    grad_top = curr_state_mid._state[-1] - curr_state_mid._state[-2]
     
-    curr_state_bottom[-1] = curr_state_bottom[-2] + grad_bottom / mid_grad_factor
-    curr_state_top[0] = curr_state_top[1] - grad_top / mid_grad_factor
+    curr_state_bottom._state[-1] = curr_state_bottom._state[-2] + grad_bottom / mid_grad_factor
+    curr_state_top._state[0] = curr_state_top._state[1] - grad_top / mid_grad_factor
 
 
 class Sandwich:
@@ -325,20 +325,20 @@ class Sandwich:
             appropriate boundary condition functions for each block.
         """
         set_boundary_conditions_bottom_block(
-            self.bottom_curr._state, 
-            self.bottom_next._state, 
+            self.bottom_curr, 
+            self.bottom_next, 
             self.grad_vec[:self.block_height], 
             self.grid_step
         )
         set_boundary_conditions_middle_block(
-            self.mid_curr._state, 
-            self.mid_next._state, 
+            self.mid_curr, 
+            self.mid_next, 
             self.grad_vec[self.block_height-1:2*self.block_height+1], 
             self.grid_step
         )
         set_boundary_conditions_top_block(
-            self.top_curr._state, 
-            self.top_next._state, 
+            self.top_curr, 
+            self.top_next, 
             self.grad_vec[2*self.block_height:3*self.block_height], 
             self.grid_step
         )
@@ -371,9 +371,9 @@ class Sandwich:
         to the middle block using the prescribed grad_factor.
         """
         transfer_data_inwards(
-            self.bottom_curr._state,
-            self.top_curr._state,
-            self.mid_curr._state,
+            self.bottom_curr,
+            self.top_curr,
+            self.mid_curr,
             self.grad_factor
         )
         
@@ -385,9 +385,9 @@ class Sandwich:
         solution, ensuring consistency across all block boundaries.
         """
         transfer_data_outwards(
-            self.bottom_next._state,
-            self.top_next._state,
-            self.mid_next._state,
+            self.bottom_next,
+            self.top_next,
+            self.mid_next,
             self.grad_factor
         )
         
