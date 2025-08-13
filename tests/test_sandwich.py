@@ -36,12 +36,9 @@ class TestSandwich:
     
     def test_state_arrays(self, sample_mesh):
         """Test that state arrays are properly initialized."""
-        assert sample_mesh.bottom_curr.state.shape == (10, 10)
-        assert sample_mesh.mid_curr.state.shape == (12, 10)  # +2 rows for boundary conditions
-        assert sample_mesh.top_curr.state.shape == (10, 10)
-        assert sample_mesh.bottom_next.state.shape == (10, 10)
-        assert sample_mesh.mid_next.state.shape == (12, 10)  # +2 rows for boundary conditions
-        assert sample_mesh.top_next.state.shape == (10, 10)
+        assert sample_mesh.bottom.state.shape == (10, 10)
+        assert sample_mesh.mid.state.shape == (12, 10)  # +2 rows for boundary conditions
+        assert sample_mesh.top.state.shape == (10, 10)
     
     def test_step_method(self, sample_mesh):
         """Test that the step method executes without error."""
@@ -66,9 +63,6 @@ class TestSandwich:
         fig = sample_mesh.plot()
         assert fig is not None
         # Additional plot-specific assertions could be added here
-
-
-
 
 
 if __name__ == "__main__":
