@@ -54,10 +54,10 @@ class Sandwich:
         # Current state blocks
         self.top = MeshBlock(block_size)
         self.bottom = MeshBlock(block_size)
-        
-        # we need one more row from each side because of boundary conditions
-        mid_block_size = (block_size[0] + 2, block_size[1])
-        self.mid = MeshBlock(mid_block_size)
+        self.mid = MeshBlock(self._pad_block_size(block_size, padding=1))
+
+    def _pad_block_size(self, block_size: tuple, padding: int) -> tuple:
+        return (block_size[0] + 2*padding, block_size[1])
         
     def step(self):
         """
