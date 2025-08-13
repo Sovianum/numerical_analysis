@@ -163,9 +163,10 @@ class Sandwich:
         """
         self._set_boundary_conditions()
         self._make_laplace_step_outer()
-        self._transfer_info_inwards()
+        self._transfer_values_inwards()
+        self._transfer_gradients_inwards()
         self._make_laplace_step_inner()
-        self._transfer_info_outwards()
+        self._transfer_gradients_outwards()
         self._swap()
         
     def plot(self, plot_abs=False):
@@ -293,32 +294,22 @@ class Sandwich:
         This private method updates the next_state array of the middle block
         by applying the finite difference Laplace operator to its current state.
         """
-        set_laplace_update(self.mid_curr._state, self.mid_next._state)    
-        
-    def _transfer_info_inwards(self):
-        """
-        Transfer data from outer blocks to the middle block.
-        
-        This private method ensures continuity between blocks by transferring
-        displacement and gradient information from the bottom and top blocks
-        to the middle block using the prescribed grad_factor.
-        """
+        set_laplace_update(self.mid_curr._state, self.mid_next._state)
+
+    def _transfer_values_inwards(self):
         # displacements are continuous
-        copy_boundary_values(self.bottom_curr, BoundaryType.TOP, self.mid_curr, BoundaryType.BOTTOM)
-        copy_boundary_values(self.top_curr, BoundaryType.BOTTOM, self.mid_curr, BoundaryType.TOP)
-        
+        copy_boundary_values(self.bottom_next, BoundaryType.TOP, self.mid_next, BoundaryType.BOTTOM)
+        copy_boundary_values(self.top_next, BoundaryType.BOTTOM, self.mid_next, BoundaryType.TOP)
+
+    def _transfer_gradients_inwards(self):
         # grads are proportional
         grad_bottom = self.bottom_curr.get_boundary_gradients(BoundaryType.TOP)
         grad_top = self.top_curr.get_boundary_gradients(BoundaryType.BOTTOM)
         
         self.mid_curr.set_boundary_gradients(BoundaryType.BOTTOM, grad_bottom * self.grad_factor, update_boundary_values=False)
         self.mid_curr.set_boundary_gradients(BoundaryType.TOP, grad_top * self.grad_factor, update_boundary_values=False)
-        
-    def _transfer_info_outwards(self):
-        # displacements are continuous
-        copy_boundary_values(self.mid_next, BoundaryType.BOTTOM, self.bottom_next, BoundaryType.TOP)
-        copy_boundary_values(self.mid_next, BoundaryType.TOP, self.top_next, BoundaryType.BOTTOM)
-        
+
+    def _transfer_gradients_outwards(self):
         # grads are proportional
         grad_bottom = self.mid_next.get_boundary_gradients(BoundaryType.BOTTOM)
         grad_top = self.mid_next.get_boundary_gradients(BoundaryType.TOP)
