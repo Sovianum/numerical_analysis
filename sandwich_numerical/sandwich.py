@@ -26,7 +26,7 @@ def set_boundary_conditions_bottom_block(curr_state: MeshBlock, next_state: Mesh
     """
 
     next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    next_state.set_boundary_values(BoundaryType.BOTTOM, curr_state._state[1]) # df/dx2 = 0 on the bottom side
+    next_state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
     
     # gradients are known on the near end
     next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
@@ -54,7 +54,7 @@ def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlo
     """
     
     next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    next_state.set_boundary_values(BoundaryType.TOP, curr_state._state[-2]) # df/dx2 = 0 on the top side
+    next_state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
     
     # gradients are known on the near end
     next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
