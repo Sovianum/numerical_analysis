@@ -276,28 +276,25 @@ class MeshBlock:
         
         return gradients_array
 
-    def set_boundary_gradients(self, boundary: BoundaryType, gradients: Union[np.ndarray, float, int], update_boundary_values: bool = True) -> None:
+    def set_boundary_gradients(self, boundary: BoundaryType, gradients: Union[np.ndarray, float, int]) -> None:
         """
-        Set boundary gradients by modifying either boundary values or adjacent values.
+        Set boundary gradients by modifying boundary values.
         
         This method works backwards from the desired gradient to determine what values
-        need to be set. When update_boundary_values=True (default), it preserves the 
-        adjacent interior values and adjusts only the boundary values to achieve the 
-        specified gradients. When update_boundary_values=False, it preserves the boundary
-        values and adjusts the adjacent interior values instead.
+        need to be set. It preserves the adjacent interior values and adjusts only the 
+        boundary values to achieve the specified gradients.
         
         The gradients are set as:
-        - Top gradient: "top line" - "adjacent line below" → adjusts top line (or adjacent line when update_boundary_values=False)
-        - Bottom gradient: "line adjacent to bottom" - "bottom line" → adjusts bottom line (or adjacent line when update_boundary_values=False)
-        - Left gradient: "line adjacent to left" - "left line" → adjusts left line (or adjacent line when update_boundary_values=False)
-        - Right gradient: "right line" - "line adjacent to right" → adjusts right line (or adjacent line when update_boundary_values=False)
+        - Top gradient: "top line" - "adjacent line below" → adjusts top line
+        - Bottom gradient: "line adjacent to bottom" - "bottom line" → adjusts bottom line
+        - Left gradient: "line adjacent to left" - "left line" → adjusts left line
+        - Right gradient: "right line" - "line adjacent to right" → adjusts right line
         
         Args:
             boundary: Boundary to update (must be BoundaryType enum)
             gradients: Desired gradients. Can be:
                 - Single number (float/int) to set all boundary gradients to the same value
                 - 1D numpy array with length matching the boundary dimension
-            update_boundary_values: If True (default), update boundary values. If False, update adjacent values.
         
         Raises:
             TypeError: If boundary is not a BoundaryType enum
@@ -316,37 +313,21 @@ class MeshBlock:
         
         # Set values to achieve the desired gradients
         if boundary == BoundaryType.TOP:
-            if update_boundary_values:
-                # Top gradient: top line - adjacent line below
-                # So: top line = adjacent line below + gradient
-                self._state[-1, :] = self._state[-2, :] + gradients_array
-            else:
-                # Update adjacent line instead: adjacent line = top line - gradient
-                self._state[-2, :] = self._state[-1, :] - gradients_array
+            # Top gradient: top line - adjacent line below
+            # So: top line = adjacent line below + gradient
+            self._state[-1, :] = self._state[-2, :] + gradients_array
         elif boundary == BoundaryType.BOTTOM:
-            if update_boundary_values:
-                # Bottom gradient: line adjacent to bottom - bottom line
-                # So: bottom line = line adjacent to bottom - gradient
-                self._state[0, :] = self._state[1, :] - gradients_array
-            else:
-                # Update adjacent line instead: adjacent line = bottom line + gradient
-                self._state[1, :] = self._state[0, :] + gradients_array
+            # Bottom gradient: line adjacent to bottom - bottom line
+            # So: bottom line = line adjacent to bottom - gradient
+            self._state[0, :] = self._state[1, :] - gradients_array
         elif boundary == BoundaryType.LEFT:
-            if update_boundary_values:
-                # Left gradient: line adjacent to left - left line
-                # So: left line = line adjacent to left - gradient
-                self._state[:, 0] = self._state[:, 1] - gradients_array
-            else:
-                # Update adjacent line instead: adjacent line = left line + gradient
-                self._state[:, 1] = self._state[:, 0] + gradients_array
+            # Left gradient: line adjacent to left - left line
+            # So: left line = line adjacent to left - gradient
+            self._state[:, 0] = self._state[:, 1] - gradients_array
         elif boundary == BoundaryType.RIGHT:
-            if update_boundary_values:
-                # Right gradient: right line - line adjacent to right
-                # So: right line = line adjacent to right + gradient
-                self._state[:, -1] = self._state[:, -2] + gradients_array
-            else:
-                # Update adjacent line instead: adjacent line = right line - gradient
-                self._state[:, -2] = self._state[:, -1] - gradients_array
+            # Right gradient: right line - line adjacent to right
+            # So: right line = line adjacent to right + gradient
+            self._state[:, -1] = self._state[:, -2] + gradients_array
         else:
             # This should never happen due to the enum validation above
             valid_boundaries = [b.value for b in BoundaryType]

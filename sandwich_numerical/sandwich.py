@@ -1,6 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
+from sandwich_numerical.solver.mesh_utils import copy_boundary_gradients, copy_boundary_values
 
 from .solver.laplace import set_laplace_update
 
@@ -86,71 +87,6 @@ def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: Mesh
     next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
 
 
-def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
-                              mid_grad_factor: float):
-    """
-    Transfer displacement and gradient data from outer blocks to the middle block.
-    
-    This function implements the data transfer mechanism that ensures continuity
-    between the three blocks of the sandwich structure. It enforces:
-    1. Displacement continuity: Values at block interfaces match exactly
-    2. Gradient proportionality: Gradients are scaled by mid_grad_factor for the middle block
-    
-    Args:
-        curr_state_bottom (MeshBlock): Current state of the bottom block
-        curr_state_top (MeshBlock): Current state of the top block  
-        curr_state_mid (MeshBlock): Current state of the middle block to be updated
-        mid_grad_factor (float): Factor to scale gradients in the middle block
-        
-    Note:
-        The function modifies curr_state_mid in-place to ensure data consistency
-        between the three blocks. This is a key step in the multi-block solver.
-    """
-    
-    # displacements are continuous
-    curr_state_mid.set_boundary_values(BoundaryType.BOTTOM, curr_state_bottom.get_boundary_values(BoundaryType.TOP))
-    curr_state_mid.set_boundary_values(BoundaryType.TOP, curr_state_top.get_boundary_values(BoundaryType.BOTTOM))
-    
-    # grads are proportional
-    grad_bottom = curr_state_bottom.get_boundary_gradients(BoundaryType.TOP)
-    grad_top = curr_state_top.get_boundary_gradients(BoundaryType.BOTTOM)
-    
-    curr_state_mid.set_boundary_gradients(BoundaryType.BOTTOM, grad_bottom * mid_grad_factor, update_boundary_values=False)
-    curr_state_mid.set_boundary_gradients(BoundaryType.TOP, grad_top * mid_grad_factor, update_boundary_values=False)
-
-def transfer_data_outwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
-                              mid_grad_factor: float):
-    """
-    Transfer displacement and gradient data from the middle block to outer blocks.
-    
-    This function implements the reverse data transfer mechanism that updates
-    the outer blocks based on the middle block's solution. It ensures:
-    1. Displacement continuity: Values at block interfaces match exactly
-    2. Gradient consistency: Gradients are properly scaled back to outer blocks
-    
-    Args:
-        curr_state_bottom (MeshBlock): Current state of the bottom block to be updated
-        curr_state_top (MeshBlock): Current state of the top block to be updated
-        curr_state_mid (MeshBlock): Current state of the middle block (source)
-        mid_grad_factor (float): Factor used to scale gradients back to outer blocks
-        
-    Note:
-        The function modifies curr_state_bottom and curr_state_top in-place.
-        This completes the data exchange cycle in the multi-block solver.
-    """
-    
-    # displacements are continuous
-    curr_state_bottom.set_boundary_values(BoundaryType.TOP, curr_state_mid.get_boundary_values(BoundaryType.BOTTOM))
-    curr_state_top.set_boundary_values(BoundaryType.BOTTOM, curr_state_mid.get_boundary_values(BoundaryType.TOP))
-    
-    # grads are proportional
-    grad_bottom = curr_state_mid.get_boundary_gradients(BoundaryType.BOTTOM)
-    grad_top = curr_state_mid.get_boundary_gradients(BoundaryType.TOP)
-    
-    curr_state_bottom.set_boundary_gradients(BoundaryType.TOP, grad_bottom / mid_grad_factor)
-    curr_state_top.set_boundary_gradients(BoundaryType.BOTTOM, grad_top / mid_grad_factor)
-
-
 class Sandwich:
     """
     A multi-block numerical solver implementing the Sandwich method for differential equations.
@@ -227,9 +163,9 @@ class Sandwich:
         """
         self._set_boundary_conditions()
         self._make_laplace_step_outer()
-        self._transfer_info_inwards()
+        self._transfer_values_inwards()
         self._make_laplace_step_inner()
-        self._transfer_info_outwards()
+        self._transfer_gradients_outwards()
         self._swap()
         
     def plot(self, plot_abs=False):
@@ -357,36 +293,19 @@ class Sandwich:
         This private method updates the next_state array of the middle block
         by applying the finite difference Laplace operator to its current state.
         """
-        set_laplace_update(self.mid_curr._state, self.mid_next._state)    
-        
-    def _transfer_info_inwards(self):
-        """
-        Transfer data from outer blocks to the middle block.
-        
-        This private method ensures continuity between blocks by transferring
-        displacement and gradient information from the bottom and top blocks
-        to the middle block using the prescribed grad_factor.
-        """
-        transfer_data_inwards(
-            self.bottom_curr,
-            self.top_curr,
-            self.mid_curr,
-            self.grad_factor
-        )
-        
-    def _transfer_info_outwards(self):
-        """
-        Transfer data from the middle block to outer blocks.
-        
-        This private method updates the outer blocks based on the middle block's
-        solution, ensuring consistency across all block boundaries.
-        """
-        transfer_data_outwards(
-            self.bottom_next,
-            self.top_next,
-            self.mid_next,
-            self.grad_factor
-        )
+        set_laplace_update(self.mid_curr._state, self.mid_next._state)
+
+    def _transfer_values_inwards(self):
+        # displacements are continuous
+        copy_boundary_values(self.bottom_next, BoundaryType.TOP, self.mid_next, BoundaryType.BOTTOM)
+        copy_boundary_values(self.top_next, BoundaryType.BOTTOM, self.mid_next, BoundaryType.TOP)
+
+    def _transfer_gradients_outwards(self):
+        # grads are proportional
+        grad_scale = 1 / self.grad_factor
+
+        copy_boundary_gradients(self.mid_next, BoundaryType.BOTTOM, self.bottom_next, BoundaryType.TOP, grad_scale)
+        copy_boundary_gradients(self.mid_next, BoundaryType.TOP, self.top_next, BoundaryType.BOTTOM, grad_scale)
         
     def _swap(self):
         """
@@ -398,9 +317,3 @@ class Sandwich:
         self.bottom_curr._state, self.bottom_next._state = self.bottom_next._state, self.bottom_curr._state
         self.mid_curr._state, self.mid_next._state = self.mid_next._state, self.mid_curr._state
         self.top_curr._state, self.top_next._state = self.top_next._state, self.top_curr._state
-
-
-
-
-
-
