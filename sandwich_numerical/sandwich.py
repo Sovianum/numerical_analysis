@@ -115,8 +115,8 @@ def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBloc
     grad_bottom = curr_state_bottom.get_boundary_gradients(BoundaryType.TOP)
     grad_top = curr_state_top.get_boundary_gradients(BoundaryType.BOTTOM)
     
-    curr_state_mid._state[1] = curr_state_mid._state[0] + mid_grad_factor * grad_bottom
-    curr_state_mid._state[-2] = curr_state_mid._state[-1] - mid_grad_factor * grad_top
+    curr_state_mid.set_boundary_gradients(BoundaryType.BOTTOM, grad_bottom * mid_grad_factor, update_boundary_values=False)
+    curr_state_mid.set_boundary_gradients(BoundaryType.TOP, grad_top * mid_grad_factor, update_boundary_values=False)
 
 def transfer_data_outwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlock, curr_state_mid: MeshBlock,
                               mid_grad_factor: float):
