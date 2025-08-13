@@ -61,7 +61,7 @@ mesh = Sandwich(
     block_size=block_size,
     grad_vec=grad_vec,
     grid_step=0.1,
-    grad_factor=1.0
+    grad_factors=[1.0]  # Single mid block
 )
 
 # Run iterations
@@ -90,7 +90,7 @@ poetry run pytest tests/ --cov=sandwich_numerical --cov-report=term-missing
 
 The main class that implements the numerical solver:
 
-- `__init__(block_size, grad_vec, grid_step, grad_factor)` - Initialize with block dimensions, gradient vector, grid step, and gradient factor
+- `__init__(block_size, grad_vec, grid_step, grad_factors)` - Initialize with block dimensions, gradient vector, grid step, and list of gradient factors for each mid block
 - `step()` - Perform one iteration of the numerical method
 - `plot()` - Generate 3D surface plots of the current state
 - `get_residual()` - Calculate the current residual (error)
