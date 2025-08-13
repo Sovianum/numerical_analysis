@@ -1,7 +1,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
-from sandwich_numerical.solver.mesh_utils import copy_boundary_values
+from sandwich_numerical.solver.mesh_utils import copy_boundary_gradients, copy_boundary_values
 
 from .solver.laplace import set_laplace_update
 
@@ -302,11 +302,10 @@ class Sandwich:
 
     def _transfer_gradients_outwards(self):
         # grads are proportional
-        grad_bottom = self.mid_next.get_boundary_gradients(BoundaryType.BOTTOM)
-        grad_top = self.mid_next.get_boundary_gradients(BoundaryType.TOP)
-        
-        self.bottom_next.set_boundary_gradients(BoundaryType.TOP, grad_bottom / self.grad_factor)
-        self.top_next.set_boundary_gradients(BoundaryType.BOTTOM, grad_top / self.grad_factor)
+        grad_scale = 1 / self.grad_factor
+
+        copy_boundary_gradients(self.mid_next, BoundaryType.BOTTOM, self.bottom_next, BoundaryType.TOP, grad_scale)
+        copy_boundary_gradients(self.mid_next, BoundaryType.TOP, self.top_next, BoundaryType.BOTTOM, grad_scale)
         
     def _swap(self):
         """
@@ -318,9 +317,3 @@ class Sandwich:
         self.bottom_curr._state, self.bottom_next._state = self.bottom_next._state, self.bottom_curr._state
         self.mid_curr._state, self.mid_next._state = self.mid_next._state, self.mid_curr._state
         self.top_curr._state, self.top_next._state = self.top_next._state, self.top_curr._state
-
-
-
-
-
-
