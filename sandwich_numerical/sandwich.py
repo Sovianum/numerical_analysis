@@ -172,19 +172,25 @@ class Sandwich:
         """
         self._set_boundary_conditions_bottom_block(
             self.bottom, 
-            self.grad_vec[:self.block_height], 
+            self._get_block_grad_vec(block_id=0, padding=0), 
             self.grid_step
         )
         self._set_boundary_conditions_middle_block(
             self.mid, 
-            self.grad_vec[self.block_height-1:2*self.block_height+1], 
+            self._get_block_grad_vec(block_id=1, padding=1), 
             self.grid_step
         )
         self._set_boundary_conditions_top_block(
             self.top, 
-            self.grad_vec[2*self.block_height:3*self.block_height], 
+            self._get_block_grad_vec(block_id=2, padding=0), 
             self.grid_step
         )
+
+    def _get_block_grad_vec(self, block_id: int, padding: int) -> np.ndarray:
+        left_idx = block_id*self.block_height - padding
+        right_idx = (block_id + 1)*self.block_height + padding
+
+        return self.grad_vec[left_idx:right_idx]
 
     def _set_boundary_conditions_bottom_block(self, state: MeshBlock, 
                                         grad_vec: np.ndarray, grid_step: float):
