@@ -108,12 +108,12 @@ def transfer_data_inwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBloc
     """
     
     # displacements are continuous
-    curr_state_mid._state[0] = curr_state_bottom._state[-1]
-    curr_state_mid._state[-1] = curr_state_top._state[0]
+    curr_state_mid.set_boundary_values(BoundaryType.BOTTOM, curr_state_bottom.get_boundary_values(BoundaryType.TOP))
+    curr_state_mid.set_boundary_values(BoundaryType.TOP, curr_state_top.get_boundary_values(BoundaryType.BOTTOM))
     
     # grads are proportional
-    grad_bottom = curr_state_bottom._state[-1] - curr_state_bottom._state[-2]
-    grad_top = curr_state_top._state[1] - curr_state_top._state[0]
+    grad_bottom = curr_state_bottom.get_boundary_gradients(BoundaryType.TOP)
+    grad_top = curr_state_top.get_boundary_gradients(BoundaryType.BOTTOM)
     
     curr_state_mid._state[1] = curr_state_mid._state[0] + mid_grad_factor * grad_bottom
     curr_state_mid._state[-2] = curr_state_mid._state[-1] - mid_grad_factor * grad_top
@@ -140,15 +140,15 @@ def transfer_data_outwards(curr_state_bottom: MeshBlock, curr_state_top: MeshBlo
     """
     
     # displacements are continuous
-    curr_state_bottom._state[-1] = curr_state_mid._state[0]
-    curr_state_top._state[0] = curr_state_mid._state[-1]
+    curr_state_bottom.set_boundary_values(BoundaryType.TOP, curr_state_mid.get_boundary_values(BoundaryType.BOTTOM))
+    curr_state_top.set_boundary_values(BoundaryType.BOTTOM, curr_state_mid.get_boundary_values(BoundaryType.TOP))
     
     # grads are proportional
-    grad_bottom = curr_state_mid._state[1] - curr_state_mid._state[0]
-    grad_top = curr_state_mid._state[-1] - curr_state_mid._state[-2]
+    grad_bottom = curr_state_mid.get_boundary_gradients(BoundaryType.BOTTOM)
+    grad_top = curr_state_mid.get_boundary_gradients(BoundaryType.TOP)
     
-    curr_state_bottom._state[-1] = curr_state_bottom._state[-2] + grad_bottom / mid_grad_factor
-    curr_state_top._state[0] = curr_state_top._state[1] - grad_top / mid_grad_factor
+    curr_state_bottom.set_boundary_gradients(BoundaryType.TOP, grad_bottom / mid_grad_factor)
+    curr_state_top.set_boundary_gradients(BoundaryType.BOTTOM, grad_top / mid_grad_factor)
 
 
 class Sandwich:
