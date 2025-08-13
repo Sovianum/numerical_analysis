@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def set_laplace_update(curr_state: np.ndarray, next_state: np.ndarray):
+def set_laplace_update(state: np.ndarray):
     """
     Apply the Laplace operator to update the next state from the current state.
     
@@ -10,21 +10,19 @@ def set_laplace_update(curr_state: np.ndarray, next_state: np.ndarray):
     (left, right, bottom, top) for each interior point.
     
     Args:
-        curr_state (np.ndarray): Current state array of shape (n, m)
-        next_state (np.ndarray): Next state array of shape (n, m) to be updated
+        state (np.ndarray): Current state array of shape (n, m)
         
     Note:
-        The function updates only the interior points (1:-1, 1:-1) of next_state.
+        The function updates only the interior points (1:-1, 1:-1) of state.
         Boundary points are assumed to be handled separately by boundary condition functions.
     """
     
-    assert len(curr_state.shape) == 2
-    assert len(next_state.shape) == 2
+    assert len(state.shape) == 2
     
-    values_left = curr_state[1:-1, :-2]
-    values_right = curr_state[1:-1, 2:]
+    values_left = state[1:-1, :-2]
+    values_right = state[1:-1, 2:]
     
-    values_bottom = curr_state[:-2, 1:-1]
-    values_top = curr_state[2:, 1:-1]
+    values_bottom = state[:-2, 1:-1]
+    values_top = state[2:, 1:-1]
     
-    next_state[1:-1, 1:-1] = (values_left + values_right + values_bottom + values_top) / 4 
+    state[1:-1, 1:-1] = (values_left + values_right + values_bottom + values_top) / 4 

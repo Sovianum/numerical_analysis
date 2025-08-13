@@ -6,7 +6,7 @@ from sandwich_numerical.solver.mesh_utils import copy_boundary_gradients, copy_b
 from .solver.laplace import set_laplace_update
 
 
-def set_boundary_conditions_bottom_block(curr_state: MeshBlock, next_state: MeshBlock, 
+def set_boundary_conditions_bottom_block(state: MeshBlock, 
                                        grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the bottom block of the sandwich structure.
@@ -17,23 +17,22 @@ def set_boundary_conditions_bottom_block(curr_state: MeshBlock, next_state: Mesh
     3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (MeshBlock): Current state mesh block
-        next_state (MeshBlock): Next state mesh block to be updated
+        state (MeshBlock): Current state mesh block
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
     Note:
-        The function modifies next_state in-place by setting boundary values.
+        The function modifies state in-place by setting boundary values.
     """
 
-    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    next_state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
+    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+    state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
     
     # gradients are known on the near end
-    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
-def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlock, 
+def set_boundary_conditions_top_block(state: MeshBlock, 
                                     grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the top block of the sandwich structure.
@@ -44,24 +43,22 @@ def set_boundary_conditions_top_block(curr_state: MeshBlock, next_state: MeshBlo
     3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (MeshBlock): Current state mesh block
-        next_state (MeshBlock): Next state mesh block to be updated
+        state (MeshBlock): Current state mesh block
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
     Note:
-        The function modifies next_state in-place by setting boundary values.
-        Assumes both mesh blocks have the same 2D shape.
+        The function modifies state in-place by setting boundary values.
     """
     
-    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    next_state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
+    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+    state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
     
     # gradients are known on the near end
-    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
-def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: MeshBlock,
+def set_boundary_conditions_middle_block(state: MeshBlock,
                                        grad_vec: np.ndarray, grid_step: float):
     """
     Set boundary conditions for the middle block of the sandwich structure.
@@ -71,8 +68,7 @@ def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: Mesh
     2. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
     
     Args:
-        curr_state (MeshBlock): Current state mesh block
-        next_state (MeshBlock): Next state mesh block to be updated
+        state (MeshBlock): Current state mesh block
         grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
         grid_step (float): Grid spacing for finite difference calculations
         
@@ -81,10 +77,10 @@ def set_boundary_conditions_middle_block(curr_state: MeshBlock, next_state: Mesh
         The middle block has no zero-gradient conditions on top/bottom sides.
     """
 
-    next_state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
     
     # gradients are known on the near end
-    next_state.set_boundary_values(BoundaryType.LEFT, curr_state._state[:, 1] - grad_vec * grid_step)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
 class Sandwich:
@@ -133,17 +129,12 @@ class Sandwich:
         self.block_height = block_size[0]
 
         # Current state blocks
-        self.top_curr = MeshBlock(block_size)
-        self.bottom_curr = MeshBlock(block_size)
+        self.top = MeshBlock(block_size)
+        self.bottom = MeshBlock(block_size)
         
         # we need one more row from each side because of boundary conditions
         mid_block_size = (block_size[0] + 2, block_size[1])
-        self.mid_curr = MeshBlock(mid_block_size)
-        
-        # Next state blocks
-        self.top_next = MeshBlock(block_size)
-        self.bottom_next = MeshBlock(block_size)
-        self.mid_next = MeshBlock(mid_block_size)
+        self.mid = MeshBlock(mid_block_size)
         
     def step(self):
         """
@@ -166,7 +157,6 @@ class Sandwich:
         self._transfer_values_inwards()
         self._make_laplace_step_inner()
         self._transfer_gradients_outwards()
-        self._swap()
         
     def plot(self, plot_abs=False):
         """
@@ -206,9 +196,9 @@ class Sandwich:
         """
         return np.concatenate(
             (
-                self.bottom_curr._state, 
-                self.mid_curr._state[1:-1], # remove boundary conditions paddings 
-                self.top_curr._state
+                self.bottom._state, 
+                self.mid._state[1:-1], # remove boundary conditions paddings 
+                self.top._state
             )
         )
     
@@ -230,9 +220,9 @@ class Sandwich:
             during iterative solution.
         """
         results = []
-        for block in [self.bottom_curr._state, self.mid_curr._state, self.top_curr._state]:
-            res_block = np.zeros_like(block)
-            set_laplace_update(block, res_block)
+        for block in [self.bottom._state, self.mid._state, self.top._state]:
+            res_block = np.copy(block)
+            set_laplace_update(res_block)
             
             results.append(
                 np.sum(
@@ -258,20 +248,17 @@ class Sandwich:
             appropriate boundary condition functions for each block.
         """
         set_boundary_conditions_bottom_block(
-            self.bottom_curr, 
-            self.bottom_next, 
+            self.bottom, 
             self.grad_vec[:self.block_height], 
             self.grid_step
         )
         set_boundary_conditions_middle_block(
-            self.mid_curr, 
-            self.mid_next, 
+            self.mid, 
             self.grad_vec[self.block_height-1:2*self.block_height+1], 
             self.grid_step
         )
         set_boundary_conditions_top_block(
-            self.top_curr, 
-            self.top_next, 
+            self.top, 
             self.grad_vec[2*self.block_height:3*self.block_height], 
             self.grid_step
         )
@@ -283,8 +270,8 @@ class Sandwich:
         This private method updates the next_state arrays of the bottom and top blocks
         by applying the finite difference Laplace operator to their current states.
         """
-        set_laplace_update(self.bottom_curr._state, self.bottom_next._state)
-        set_laplace_update(self.top_curr._state, self.top_next._state)
+        set_laplace_update(self.bottom._state)
+        set_laplace_update(self.top._state)
         
     def _make_laplace_step_inner(self):
         """
@@ -293,27 +280,16 @@ class Sandwich:
         This private method updates the next_state array of the middle block
         by applying the finite difference Laplace operator to its current state.
         """
-        set_laplace_update(self.mid_curr._state, self.mid_next._state)
+        set_laplace_update(self.mid._state)
 
     def _transfer_values_inwards(self):
         # displacements are continuous
-        copy_boundary_values(self.bottom_next, BoundaryType.TOP, self.mid_next, BoundaryType.BOTTOM)
-        copy_boundary_values(self.top_next, BoundaryType.BOTTOM, self.mid_next, BoundaryType.TOP)
+        copy_boundary_values(self.bottom, BoundaryType.TOP, self.mid, BoundaryType.BOTTOM)
+        copy_boundary_values(self.top, BoundaryType.BOTTOM, self.mid, BoundaryType.TOP)
 
     def _transfer_gradients_outwards(self):
         # grads are proportional
         grad_scale = 1 / self.grad_factor
 
-        copy_boundary_gradients(self.mid_next, BoundaryType.BOTTOM, self.bottom_next, BoundaryType.TOP, grad_scale)
-        copy_boundary_gradients(self.mid_next, BoundaryType.TOP, self.top_next, BoundaryType.BOTTOM, grad_scale)
-        
-    def _swap(self):
-        """
-        Swap current and next state arrays for all blocks.
-        
-        This private method prepares for the next iteration by making the
-        computed next_state arrays the new current_state arrays.
-        """
-        self.bottom_curr._state, self.bottom_next._state = self.bottom_next._state, self.bottom_curr._state
-        self.mid_curr._state, self.mid_next._state = self.mid_next._state, self.mid_curr._state
-        self.top_curr._state, self.top_next._state = self.top_next._state, self.top_curr._state
+        copy_boundary_gradients(self.mid, BoundaryType.BOTTOM, self.bottom, BoundaryType.TOP, grad_scale)
+        copy_boundary_gradients(self.mid, BoundaryType.TOP, self.top, BoundaryType.BOTTOM, grad_scale)
