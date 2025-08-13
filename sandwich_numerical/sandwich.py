@@ -6,83 +6,6 @@ from sandwich_numerical.solver.mesh_utils import copy_boundary_gradients, copy_b
 from .solver.laplace import set_laplace_update
 
 
-def set_boundary_conditions_bottom_block(state: MeshBlock, 
-                                       grad_vec: np.ndarray, grid_step: float):
-    """
-    Set boundary conditions for the bottom block of the sandwich structure.
-    
-    This function enforces three types of boundary conditions:
-    1. Fixed boundary: The far end (right side) is clamped to zero
-    2. Zero gradient: The bottom side has zero normal derivative (df/dx2 = 0)
-    3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
-    
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-        
-    Note:
-        The function modifies state in-place by setting boundary values.
-    """
-
-    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
-    
-    # gradients are known on the near end
-    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
-
-
-def set_boundary_conditions_top_block(state: MeshBlock, 
-                                    grad_vec: np.ndarray, grid_step: float):
-    """
-    Set boundary conditions for the top block of the sandwich structure.
-    
-    This function enforces three types of boundary conditions:
-    1. Fixed boundary: The far end (right side) is clamped to zero
-    2. Zero gradient: The top side has zero normal derivative (df/dx2 = 0)
-    3. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
-    
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-        
-    Note:
-        The function modifies state in-place by setting boundary values.
-    """
-    
-    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
-    
-    # gradients are known on the near end
-    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
-
-
-def set_boundary_conditions_middle_block(state: MeshBlock,
-                                       grad_vec: np.ndarray, grid_step: float):
-    """
-    Set boundary conditions for the middle block of the sandwich structure.
-    
-    This function enforces two types of boundary conditions:
-    1. Fixed boundary: The far end (right side) is clamped to zero
-    2. Prescribed gradient: The near end (left side) has a known gradient from grad_vec
-    
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-        
-    Note:
-        The function modifies next_state in-place by setting boundary values.
-        The middle block has no zero-gradient conditions on top/bottom sides.
-    """
-
-    state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-    
-    # gradients are known on the near end
-    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
-
-
 class Sandwich:
     """
     A multi-block numerical solver implementing the Sandwich method for differential equations.
@@ -247,21 +170,45 @@ class Sandwich:
             This method modifies the next_state arrays in-place by calling the
             appropriate boundary condition functions for each block.
         """
-        set_boundary_conditions_bottom_block(
+        self._set_boundary_conditions_bottom_block(
             self.bottom, 
             self.grad_vec[:self.block_height], 
             self.grid_step
         )
-        set_boundary_conditions_middle_block(
+        self._set_boundary_conditions_middle_block(
             self.mid, 
             self.grad_vec[self.block_height-1:2*self.block_height+1], 
             self.grid_step
         )
-        set_boundary_conditions_top_block(
+        self._set_boundary_conditions_top_block(
             self.top, 
             self.grad_vec[2*self.block_height:3*self.block_height], 
             self.grid_step
         )
+
+    def _set_boundary_conditions_bottom_block(self, state: MeshBlock, 
+                                        grad_vec: np.ndarray, grid_step: float):
+        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+        state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
+        
+        # gradients are known on the near end
+        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+
+    def _set_boundary_conditions_middle_block(self, state: MeshBlock,
+                                        grad_vec: np.ndarray, grid_step: float):
+
+        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+        
+        # gradients are known on the near end
+        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+
+    def _set_boundary_conditions_top_block(self, state: MeshBlock, 
+                                        grad_vec: np.ndarray, grid_step: float):
+        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
+        state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
+        
+        # gradients are known on the near end
+        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
         
     def _make_laplace_step_outer(self):
         """
