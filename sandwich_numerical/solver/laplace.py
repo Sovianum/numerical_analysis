@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def set_laplace_update(state: np.ndarray):
+def set_laplace_update(state: np.ndarray, learning_rate: float = 1.0):
     """
     Apply the Laplace operator to update the next state from the current state.
     
@@ -24,5 +24,8 @@ def set_laplace_update(state: np.ndarray):
     
     values_bottom = state[:-2, 1:-1]
     values_top = state[2:, 1:-1]
-    
-    state[1:-1, 1:-1] = (values_left + values_right + values_bottom + values_top) / 4 
+
+    old_mid_state = state[1:-1, 1:-1]
+    new_mid_state = (values_left + values_right + values_bottom + values_top) / 4 
+
+    state[1:-1, 1:-1] = old_mid_state + learning_rate * (new_mid_state - old_mid_state)

@@ -29,7 +29,7 @@ class Sandwich:
         blocks (list): List of all mesh blocks in order: [bottom, mid1, mid2, ..., midN, top]
     """
     
-    def __init__(self, num_mid_blocks, block_size, grad_vec, grid_step, grad_factors):
+    def __init__(self, num_mid_blocks, block_size, grad_vec, grid_step, grad_factors, learning_rate=1.0):
         """
         Initialize the generalized Sandwich solver with the specified parameters.
         
@@ -52,7 +52,7 @@ class Sandwich:
         self.grid_step = grid_step
         self.grad_factors = grad_factors
         self.num_mid_blocks = num_mid_blocks
-        
+        self.learning_rate = learning_rate
         # Validate that we have an odd number of mid blocks
         if self.num_mid_blocks % 2 == 0:
             raise ValueError("Number of mid blocks must be odd")
@@ -286,8 +286,8 @@ class Sandwich:
         
         while left_index < mid_mid_index and right_index > mid_mid_index:
             # Apply Laplace to current pair of middle blocks
-            set_laplace_update(self.blocks[left_index]._state)
-            set_laplace_update(self.blocks[right_index]._state)
+            set_laplace_update(self.blocks[left_index]._state, self.learning_rate)
+            set_laplace_update(self.blocks[right_index]._state, self.learning_rate)
             
             # Transfer values to adjacent inner blocks
             if left_index + 1 < len(self.blocks):
@@ -302,7 +302,7 @@ class Sandwich:
             right_index -= 1
         
         # Apply Laplace to the middle mid block
-        set_laplace_update(self.blocks[mid_mid_index]._state)
+        set_laplace_update(self.blocks[mid_mid_index]._state, self.learning_rate)
 
     def _transfer_gradients_outwards(self):
         """
@@ -324,6 +324,11 @@ class Sandwich:
         
         # Continue pairwise outward until reaching the outer blocks
         while left_index > 0 and right_index < len(self.blocks) - 1:
+            if left_index != mid_mid_index:
+                set_laplace_update(self.blocks[left_index]._state, self.learning_rate)
+            if right_index != mid_mid_index:
+                set_laplace_update(self.blocks[right_index]._state, self.learning_rate)
+
             # Transfer gradients from current middle blocks to adjacent outer blocks
             if left_index > 0:
                 grad_scale = self._get_grad_scale(left_index, left_index - 1)

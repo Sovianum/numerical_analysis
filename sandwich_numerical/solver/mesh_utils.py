@@ -66,6 +66,9 @@ def copy_boundary_gradients(source_block: MeshBlock,
     
     # Apply scaling and offset
     scaled_gradients = source_gradients * scaling_factor
+
+    print(f"source_gradients: {source_gradients}")
+    print(f"scaled_gradients: {scaled_gradients}")
     
     # Set boundary gradients in target block
     target_block.set_boundary_gradients(target_boundary, scaled_gradients)
