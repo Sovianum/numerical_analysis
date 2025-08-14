@@ -98,17 +98,79 @@ class Sandwich:
         
         This method performs the complete solution cycle:
         1. Set boundary conditions for all blocks
-        2. Go inwards transferring values from outer blocks to inner blocks
-        3. Go outwards transferring gradients from inner blocks to outer blocks
-        4. Each layer has its own grad factor for gradient scaling
+        2. Run Laplace step on all blocks
+        3. Get gradients of all blocks
+        4. Transfer saved gradients to adjacent blocks
         
         Note:
             This method modifies the internal state arrays in-place.
             Call this method repeatedly in a loop to converge to the solution.
         """
         self._set_boundary_conditions()
-        self._transfer_values_inwards()
-        self._transfer_gradients_outwards()
+        self._run_laplace_on_all_blocks()
+        stored_gradients = self._get_gradients_of_all_blocks()
+        self._transfer_saved_gradients_to_adjacent_blocks(stored_gradients)
+
+    def _run_laplace_on_all_blocks(self):
+        """
+        Phase 1: Run Laplace step on all blocks.
+        
+        This method applies the Laplace operator to all blocks in the system.
+        """
+        for block in self.blocks:
+            set_laplace_update(block._state, self.learning_rate)
+
+    def _get_gradients_of_all_blocks(self):
+        """
+        Phase 2: Get gradients of all blocks.
+        
+        This method extracts and stores gradients from all blocks for later transfer.
+        It computes gradients at TOP and BOTTOM boundaries of each block and returns them
+        for use in the gradient transfer phase.
+        
+        Returns:
+            dict: Nested dictionary containing gradients for each block at TOP and BOTTOM boundaries
+        """
+        # Store gradients for each block at TOP and BOTTOM boundaries only
+        stored_gradients = {}
+        
+        for i, block in enumerate(self.blocks):
+            stored_gradients[i] = {}
+            
+            # Extract gradients only at TOP and BOTTOM boundaries for this block
+            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
+                try:
+                    gradients = block.get_boundary_gradients(boundary)
+                    stored_gradients[i][boundary] = gradients.copy()
+                except ValueError:
+                    # Block might be too small for gradients, store None
+                    stored_gradients[i][boundary] = None
+        
+        return stored_gradients
+
+    def _transfer_saved_gradients_to_adjacent_blocks(self, stored_gradients):
+        """
+        Phase 3: Transfer saved gradients to adjacent blocks.
+        
+        This method transfers boundary gradients from each block to its adjacent blocks,
+        using the appropriate gradient scaling factors and the pre-computed gradients.
+        
+        Args:
+            stored_gradients (dict): Nested dictionary containing gradients for each block and boundary
+        """
+        # Transfer gradients between adjacent blocks
+        for i in range(len(self.blocks) - 1):
+            # Transfer from current block to next block (bottom to top direction)
+            self.blocks[i + 1].set_boundary_gradients(
+                BoundaryType.BOTTOM, 
+                stored_gradients[i][BoundaryType.TOP] * self._get_grad_scale(i, i + 1)
+            )
+            
+            # Transfer from next block to current block (top to bottom direction)
+            self.blocks[i].set_boundary_gradients(
+                BoundaryType.TOP, 
+                stored_gradients[i + 1][BoundaryType.BOTTOM] * self._get_grad_scale(i + 1, i)
+            )
         
     def plot(self, plot_abs=False):
         """
@@ -267,81 +329,5 @@ class Sandwich:
         # gradients are known on the near end
         state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
         
-    def _transfer_values_inwards(self):
-        """
-        Transfer values inwards from outer blocks to inner blocks using a pairwise approach.
-        
-        This method implements the first phase of the step method:
-        1. Apply Laplace operator to outer blocks (top and bottom)
-        2. Transfer boundary values from outer blocks to adjacent middle blocks
-        3. Repeat pairwise until reaching the middle mid block
-        4. Apply Laplace operator to the middle mid block
-        """
-        # Calculate the middle index of blocks
-        mid_mid_index = len(self.blocks) // 2
-        
-        # Continue pairwise until reaching the middle mid block
-        left_index = 0
-        right_index = len(self.blocks) - 1
-        
-        while left_index < mid_mid_index and right_index > mid_mid_index:
-            # Apply Laplace to current pair of middle blocks
-            set_laplace_update(self.blocks[left_index]._state, self.learning_rate)
-            set_laplace_update(self.blocks[right_index]._state, self.learning_rate)
-            
-            # Transfer values to adjacent inner blocks
-            if left_index + 1 < len(self.blocks):
-                copy_boundary_values(self.blocks[left_index], BoundaryType.TOP, 
-                                   self.blocks[left_index + 1], BoundaryType.BOTTOM)
-            
-            if right_index - 1 >= 0:
-                copy_boundary_values(self.blocks[right_index], BoundaryType.BOTTOM, 
-                                   self.blocks[right_index - 1], BoundaryType.TOP)
-            
-            left_index += 1
-            right_index -= 1
-        
-        # Apply Laplace to the middle mid block
-        set_laplace_update(self.blocks[mid_mid_index]._state, self.learning_rate)
-
-    def _transfer_gradients_outwards(self):
-        """
-        Transfer gradients outwards from inner blocks to outer blocks using a pairwise approach.
-        
-        This method implements the second phase of the step method:
-        1. Start from the middle mid block
-        2. Transfer gradients to adjacent middle blocks (left and right)
-        3. Continue pairwise outward until reaching the outer blocks
-        4. Transfer gradients from middle blocks to outer blocks (bottom and top)
-        with each layer having its own grad factor for scaling.
-        """
-        # Calculate the middle index of mid blocks
-        mid_mid_index = len(self.blocks) // 2
-        
-        # Start from the middle mid block and work outward
-        left_index = mid_mid_index
-        right_index = mid_mid_index
-        
-        # Continue pairwise outward until reaching the outer blocks
-        while left_index > 0 and right_index < len(self.blocks) - 1:
-            if left_index != mid_mid_index:
-                set_laplace_update(self.blocks[left_index]._state, self.learning_rate)
-            if right_index != mid_mid_index:
-                set_laplace_update(self.blocks[right_index]._state, self.learning_rate)
-
-            # Transfer gradients from current middle blocks to adjacent outer blocks
-            if left_index > 0:
-                grad_scale = self._get_grad_scale(left_index, left_index - 1)
-                copy_boundary_gradients(self.blocks[left_index], BoundaryType.BOTTOM, 
-                                       self.blocks[left_index - 1], BoundaryType.TOP, grad_scale)
-            
-            if right_index < len(self.blocks) - 1:
-                grad_scale = self._get_grad_scale(right_index, right_index + 1)
-                copy_boundary_gradients(self.blocks[right_index], BoundaryType.TOP, 
-                                       self.blocks[right_index + 1], BoundaryType.BOTTOM, grad_scale)
-            
-            left_index -= 1
-            right_index += 1
-
     def _get_grad_scale(self, block_id_curr: int, block_id_next: int) -> float:
         return self.grad_factors[block_id_curr] / self.grad_factors[block_id_next]
