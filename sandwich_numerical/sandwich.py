@@ -224,16 +224,20 @@ class Sandwich:
         # Transfer gradients between adjacent blocks
         for i in range(len(self.blocks) - 1):
             # Transfer from current block to next block (bottom to top direction)
-            self.blocks[i + 1].set_boundary_gradients(
-                BoundaryType.BOTTOM, 
-                stored_gradients[i][BoundaryType.TOP] * self._get_grad_scale(i, i + 1)
-            )
+            grad_scale_forward = self._get_grad_scale(i, i + 1)
+            if grad_scale_forward <= 1: # without this dirty hack gradients are exploding
+                self.blocks[i + 1].set_boundary_gradients(
+                    BoundaryType.BOTTOM, 
+                    stored_gradients[i][BoundaryType.TOP] * grad_scale_forward
+                )
             
             # Transfer from next block to current block (top to bottom direction)
-            self.blocks[i].set_boundary_gradients(
-                BoundaryType.TOP, 
-                stored_gradients[i + 1][BoundaryType.BOTTOM] * self._get_grad_scale(i + 1, i)
-            )
+            grad_scale_backward = self._get_grad_scale(i + 1, i)
+            if grad_scale_backward <= 1: # without this dirty hack gradients are exploding
+                self.blocks[i].set_boundary_gradients(
+                    BoundaryType.TOP, 
+                    stored_gradients[i + 1][BoundaryType.BOTTOM] * self._get_grad_scale(i + 1, i)
+                )
         
     def plot(self, plot_abs=False):
         """
