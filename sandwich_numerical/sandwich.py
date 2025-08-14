@@ -101,15 +101,27 @@ class Sandwich:
         2. Run Laplace step on all blocks
         3. Get gradients of all blocks
         4. Transfer saved gradients to adjacent blocks
+        5. Run Laplace step again on all blocks
+        6. Get all boundary values
+        7. Transfer boundary values to adjacent blocks
         
         Note:
             This method modifies the internal state arrays in-place.
             Call this method repeatedly in a loop to converge to the solution.
         """
         self._set_boundary_conditions()
+
         self._run_laplace_on_all_blocks()
-        stored_gradients = self._get_gradients_of_all_blocks()
-        self._transfer_saved_gradients_to_adjacent_blocks(stored_gradients)
+
+        self._transfer_saved_gradients_to_adjacent_blocks(
+            self._get_gradients_of_all_blocks()
+        )
+
+        self._run_laplace_on_all_blocks()
+
+        self._transfer_boundary_values_to_adjacent_blocks(
+            self._get_all_boundary_values()
+        )
 
     def _run_laplace_on_all_blocks(self):
         """
@@ -147,6 +159,57 @@ class Sandwich:
                     stored_gradients[i][boundary] = None
         
         return stored_gradients
+
+    def _get_all_boundary_values(self):
+        """
+        Get boundary values of all blocks.
+        
+        This method extracts boundary values from all blocks at TOP and BOTTOM boundaries
+        for later transfer to adjacent blocks.
+        
+        Returns:
+            dict: Nested dictionary containing boundary values for each block at TOP and BOTTOM boundaries
+        """
+        # Store boundary values for each block at TOP and BOTTOM boundaries only
+        stored_boundary_values = {}
+        
+        for i, block in enumerate(self.blocks):
+            stored_boundary_values[i] = {}
+            
+            # Extract boundary values only at TOP and BOTTOM boundaries for this block
+            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
+                try:
+                    boundary_values = block.get_boundary_values(boundary)
+                    stored_boundary_values[i][boundary] = boundary_values.copy()
+                except ValueError:
+                    # Block might be too small, store None
+                    stored_boundary_values[i][boundary] = None
+        
+        return stored_boundary_values
+
+    def _transfer_boundary_values_to_adjacent_blocks(self, stored_boundary_values):
+        """
+        Transfer boundary values to adjacent blocks.
+        
+        This method transfers boundary values from each block to its adjacent blocks
+        at the TOP and BOTTOM boundaries.
+        
+        Args:
+            stored_boundary_values (dict): Nested dictionary containing boundary values for each block and boundary
+        """
+        # Transfer boundary values between adjacent blocks
+        for i in range(len(self.blocks) - 1):
+            # Transfer from current block to next block (bottom to top direction)
+            self.blocks[i + 1].set_boundary_values(
+                BoundaryType.BOTTOM, 
+                stored_boundary_values[i][BoundaryType.TOP]
+            )
+            
+            # Transfer from next block to current block (top to bottom direction)
+            self.blocks[i].set_boundary_values(
+                BoundaryType.TOP, 
+                stored_boundary_values[i + 1][BoundaryType.BOTTOM]
+            )
 
     def _transfer_saved_gradients_to_adjacent_blocks(self, stored_gradients):
         """
