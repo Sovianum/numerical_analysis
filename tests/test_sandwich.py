@@ -15,13 +15,16 @@ class TestSandwich:
         """Create a sample Sandwich mesh for testing."""
         block_size = (10, 10)  # (height, width) tuple
         grid_step = 0.1
-        grad_factors = [1.0]  # Single mid block
+        num_mid_blocks = 1
+        # Gradient factors for all blocks: [bottom, mid1, top]
+        grad_factors = [1.0, 1.0, 1.0]
     
-        # Create simple gradient vector - should be 1D with length (2 + num_mid_blocks) * block_height + 1
-        # For 1 mid block: (2 + 1) * 10 + 1 = 31
-        grad_vec = np.linspace(0, 1, (2 + len(grad_factors)) * block_size[0] + 1)
+        # Create simple gradient vector - should be 1D with length (2 + num_mid_blocks) * block_height
+        # For 1 mid block: (2 + 1) * 10 = 30
+        grad_vec = np.linspace(0, 1, (2 + num_mid_blocks) * block_size[0])
     
         return Sandwich(
+            num_mid_blocks=num_mid_blocks,
             block_size=block_size,
             grad_vec=grad_vec,
             grid_step=grid_step,
@@ -33,12 +36,15 @@ class TestSandwich:
         """Create a Sandwich mesh with multiple mid blocks for testing."""
         block_size = (8, 8)  # (height, width) tuple
         grid_step = 0.1
-        grad_factors = [1.0, 1.5, 0.8]  # Three mid blocks
+        num_mid_blocks = 3
+        # Gradient factors for all blocks: [bottom, mid1, mid2, mid3, top]
+        grad_factors = [1.0, 1.0, 1.5, 0.8, 1.0]
     
-        # Create gradient vector for 5 total blocks: (2 + 3) * 8 + 1 = 41
-        grad_vec = np.linspace(0, 1, (2 + len(grad_factors)) * block_size[0] + 1)
+        # Create gradient vector for 5 total blocks: (2 + 3) * 8 = 40
+        grad_vec = np.linspace(0, 1, (2 + num_mid_blocks) * block_size[0])
     
         return Sandwich(
+            num_mid_blocks=num_mid_blocks,
             block_size=block_size,
             grad_vec=grad_vec,
             grid_step=grid_step,
@@ -49,17 +55,17 @@ class TestSandwich:
         """Test that Sandwich objects can be created."""
         assert sample_mesh.block_size == (10, 10)
         assert sample_mesh.grid_step == 0.1
-        assert sample_mesh.grad_factors == [1.0]
+        assert sample_mesh.grad_factors == [1.0, 1.0, 1.0]
         assert sample_mesh.num_mid_blocks == 1
-        assert sample_mesh.grad_vec.shape == (31,)  # (2 + 1) * 10 + 1 = 31
+        assert sample_mesh.grad_vec.shape == (30,)  # (2 + 1) * 10 = 30
     
     def test_multi_mid_creation(self, multi_mid_mesh):
         """Test that Sandwich objects with multiple mid blocks can be created."""
         assert multi_mid_mesh.block_size == (8, 8)
         assert multi_mid_mesh.grid_step == 0.1
-        assert multi_mid_mesh.grad_factors == [1.0, 1.5, 0.8]
+        assert multi_mid_mesh.grad_factors == [1.0, 1.0, 1.5, 0.8, 1.0]
         assert multi_mid_mesh.num_mid_blocks == 3
-        assert multi_mid_mesh.grad_vec.shape == (41,)  # (2 + 3) * 8 + 1 = 41
+        assert multi_mid_mesh.grad_vec.shape == (40,)  # (2 + 3) * 8 = 40
     
     def test_state_arrays(self, sample_mesh):
         """Test that state arrays are properly initialized."""
@@ -131,12 +137,14 @@ class TestSandwich:
         block_size = (10, 10)
         grid_step = 0.1
         grad_factors = [1.0, 1.5]  # Even number of mid blocks
+        num_mid_blocks = 2
         
-        # Create gradient vector for 4 total blocks: (2 + 2) * 10 + 1 = 41
-        grad_vec = np.linspace(0, 1, (2 + len(grad_factors)) * block_size[0] + 1)
+        # Create gradient vector for 4 total blocks: (2 + 2) * 10 = 40
+        grad_vec = np.linspace(0, 1, (2 + num_mid_blocks) * block_size[0])
         
         with pytest.raises(ValueError, match="Number of mid blocks must be odd"):
             Sandwich(
+                num_mid_blocks=num_mid_blocks,
                 block_size=block_size,
                 grad_vec=grad_vec,
                 grid_step=grid_step,
@@ -148,12 +156,14 @@ class TestSandwich:
         block_size = (10, 10)
         grid_step = 0.1
         grad_factors = [1.0, 1.5, 0.8]  # Three mid blocks
+        num_mid_blocks = 3
         
         # Wrong length gradient vector
-        grad_vec = np.linspace(0, 1, 30)  # Should be 51 for (2 + 3) * 10 + 1
+        grad_vec = np.linspace(0, 1, 30)  # Should be 50 for (2 + 3) * 10
         
-        with pytest.raises(ValueError, match="grad_vec must have length 51, got 30"):
+        with pytest.raises(ValueError, match="grad_vec must have length 50, got 30"):
             Sandwich(
+                num_mid_blocks=num_mid_blocks,
                 block_size=block_size,
                 grad_vec=grad_vec,
                 grid_step=grid_step,
