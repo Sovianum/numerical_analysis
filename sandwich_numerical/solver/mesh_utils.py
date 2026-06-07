@@ -1,4 +1,4 @@
-from .mesh_block import BoundaryType, MeshBlock
+from .mesh_block import MeshBlock, BoundaryType
 
 
 def copy_boundary_values(
@@ -28,7 +28,10 @@ def copy_boundary_values(
         copy_boundary_values(block1, block2, BoundaryType.LEFT, BoundaryType.RIGHT)
     """
 
+    # Get boundary values from source block
     source_values = source_block.get_boundary_values(source_boundary)
+
+    # Set boundary values in target block
     target_block.set_boundary_values(target_boundary, source_values)
 
 
@@ -63,6 +66,11 @@ def copy_boundary_gradients(
         copy_boundary_gradients(block1, block2, BoundaryType.LEFT, BoundaryType.RIGHT)
     """
 
+    # Get boundary gradients from source block
     source_gradients = source_block.get_boundary_gradients(source_boundary)
+
+    # Apply scaling and offset
     scaled_gradients = source_gradients * scaling_factor
+
+    # Set boundary gradients in target block
     target_block.set_boundary_gradients(target_boundary, scaled_gradients)

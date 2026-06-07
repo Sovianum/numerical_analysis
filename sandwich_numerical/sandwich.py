@@ -71,14 +71,10 @@ class Sandwich:
         grad_vec: np.ndarray,
         grid_step: float,
         grad_factors: Sequence[float],
-        learning_rate: float = 1.0,
     ) -> None:
         self.block_size = self._validate_block_size(block_size)
         self.block_height = self.block_size[0]
         self.grid_step = self._validate_positive_number(grid_step, "grid_step")
-        self.learning_rate = self._validate_positive_number(
-            learning_rate, "learning_rate"
-        )
         self.num_mid_blocks = self._validate_num_mid_blocks(num_mid_blocks)
         self.total_blocks = 2 + self.num_mid_blocks
         self.grad_factors = self._validate_grad_factors(grad_factors, self.total_blocks)
@@ -261,11 +257,9 @@ class Sandwich:
 
             set_laplace_update(
                 self.blocks[lower_index]._state,
-                self.learning_rate,
             )
             set_laplace_update(
                 self.blocks[upper_index]._state,
-                self.learning_rate,
             )
 
             self._copy_boundary_values(
@@ -283,7 +277,6 @@ class Sandwich:
 
         set_laplace_update(
             self.blocks[center_index]._state,
-            self.learning_rate,
         )
 
     def _transfer_gradients_outward(self) -> None:
