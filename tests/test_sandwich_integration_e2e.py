@@ -1,4 +1,4 @@
-"""End-to-end regression checks for the notebook-sized Sandwich runs."""
+"""End-to-end regression checks for the scripted Sandwich integration runs."""
 
 from pathlib import Path
 

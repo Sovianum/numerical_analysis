@@ -10,8 +10,8 @@ This project contains Python implementations of numerical analysis methods, spec
 - `tests/` - Test suite
   - `__init__.py` - Tests package
   - `test_sandwich.py` - Comprehensive pytest test suite
-- `notebooks/` - Jupyter notebooks directory
-  - `Sandwich.ipynb` - Original Jupyter notebook (for reference)
+- `scripts/` - Reproducible command-line runners
+  - `run_sandwich_integration.py` - Generate Sandwich integration CSV/PNG artifacts
 - `sandwich.py` - Root-level implementation with utility functions
 - `pyproject.toml` - Poetry configuration and dependencies
 - `README.md` - This documentation file
@@ -210,8 +210,8 @@ numerical_analysis/
 ├── tests/                       # Test suite
 │   ├── __init__.py              # Tests package
 │   └── test_sandwich.py         # Comprehensive pytest tests
-├── notebooks/                   # Jupyter notebooks
-│   └── Sandwich.ipynb           # Original Jupyter notebook
+├── scripts/                     # Command-line runners
+│   └── run_sandwich_integration.py
 ├── .github/                     # GitHub configuration
 │   └── workflows/               # GitHub Actions workflows
 │       └── test.yml             # CI workflow with coverage
