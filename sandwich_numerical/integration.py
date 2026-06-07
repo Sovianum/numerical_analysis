@@ -27,6 +27,8 @@ class SandwichRun:
     detail_heatmap_columns: int
     sample_x1_positions: tuple[float, ...]
     gradient_profile: str = "sine"
+    gradient_relaxation: float = 1.0
+    enforce_overlap_continuity: bool = True
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,20 @@ SANDWICH_RUNS: tuple[SandwichRun, ...] = (
         heatmap_columns=1_000,
         detail_heatmap_columns=100,
         sample_x1_positions=(0.0, 0.2, 0.4, 1.0),
+    ),
+    SandwichRun(
+        name="grad_factors_1000_1_1000_1_1000",
+        block_height=21,
+        block_width=3000,
+        grid_step=0.005,
+        grad_factors=(1_000.0, 1.0, 1_000.0, 1.0, 1_000.0),
+        iterations=10_000,
+        residual_every=500,
+        progress_every=500,
+        heatmap_columns=1_000,
+        detail_heatmap_columns=100,
+        sample_x1_positions=(0.0, 0.2, 0.4, 1.0),
+        gradient_relaxation=0.001,
     ),
 )
 
@@ -115,6 +131,8 @@ def create_sandwich(run: SandwichRun) -> Sandwich:
         grad_vec=build_gradient_vector(run),
         grid_step=run.grid_step,
         grad_factors=run.grad_factors,
+        gradient_relaxation=run.gradient_relaxation,
+        enforce_overlap_continuity=run.enforce_overlap_continuity,
     )
 
 

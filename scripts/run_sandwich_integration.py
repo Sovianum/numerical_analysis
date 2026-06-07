@@ -86,6 +86,25 @@ def parse_args() -> argparse.Namespace:
         help="Override block width for all selected sandwiches; useful for smoke runs.",
     )
     parser.add_argument(
+        "--gradient-relaxation",
+        type=float,
+        help="Under-relaxation for copied interface gradients.",
+    )
+    overlap_group = parser.add_mutually_exclusive_group()
+    overlap_group.add_argument(
+        "--enforce-overlap-continuity",
+        dest="enforce_overlap_continuity",
+        action="store_true",
+        default=None,
+        help="Average duplicate real/ghost rows shared by adjacent blocks.",
+    )
+    overlap_group.add_argument(
+        "--no-enforce-overlap-continuity",
+        dest="enforce_overlap_continuity",
+        action="store_false",
+        help="Disable averaging of duplicate real/ghost rows.",
+    )
+    parser.add_argument(
         "--csv-only",
         action="store_true",
         help="Write CSV data without PNG figures.",
@@ -98,6 +117,9 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
         raise SystemExit("--iterations must be non-negative.")
     if args.block_width is not None and args.block_width < 2:
         raise SystemExit("--block-width must be at least 2.")
+    if args.gradient_relaxation is not None:
+        if not (0 < args.gradient_relaxation <= 1):
+            raise SystemExit("--gradient-relaxation must be in the interval (0, 1].")
 
     runs: Iterable[SandwichRun] = SANDWICH_RUNS
     if args.case:
@@ -118,6 +140,10 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             replacements["detail_heatmap_columns"] = min(
                 run.detail_heatmap_columns, args.block_width
             )
+        if args.gradient_relaxation is not None:
+            replacements["gradient_relaxation"] = args.gradient_relaxation
+        if args.enforce_overlap_continuity is not None:
+            replacements["enforce_overlap_continuity"] = args.enforce_overlap_continuity
         prepared.append(dataclasses.replace(run, **replacements))
 
     if not prepared:
@@ -142,6 +168,8 @@ def run_case(
         f"({run.block_height}, {run.block_width}), "
         f"grid_step={run.grid_step}, "
         f"grad_factors={run.grad_factors}, "
+        f"gradient_relaxation={run.gradient_relaxation}, "
+        f"enforce_overlap_continuity={run.enforce_overlap_continuity}, "
         f"iterations={run.iterations}"
     )
 
@@ -186,6 +214,7 @@ def write_solution_figures(
         make_heatmap_figure(
             displacement[:, :heatmap_columns],
             f"Displacement {run.name}: first {heatmap_columns} columns",
+            layer_boundary_rows(run),
         ),
         case_dir / "displacement_heatmap.png",
     )
@@ -193,11 +222,16 @@ def write_solution_figures(
         make_heatmap_figure(
             displacement[:, :detail_columns],
             f"Displacement {run.name}: first {detail_columns} columns",
+            layer_boundary_rows(run),
         ),
         case_dir / "displacement_detail_heatmap.png",
     )
     write_figure_png(
-        make_samples_figure(solution.samples, f"Samples {run.name}"),
+        make_samples_figure(
+            solution.samples,
+            f"Samples {run.name}",
+            layer_boundary_x2(run),
+        ),
         case_dir / "samples.png",
     )
     write_figure_png(
@@ -206,7 +240,17 @@ def write_solution_figures(
     )
 
 
-def make_heatmap_figure(data: np.ndarray, title: str):
+def layer_boundary_rows(run: SandwichRun) -> np.ndarray:
+    return np.arange(1, len(run.grad_factors)) * run.block_height - 0.5
+
+
+def layer_boundary_x2(run: SandwichRun) -> np.ndarray:
+    return layer_boundary_rows(run) * run.grid_step
+
+
+def make_heatmap_figure(
+    data: np.ndarray, title: str, layer_boundaries: np.ndarray | None = None
+):
     fig, ax = plt.subplots(figsize=(11.2, 6.5))
     image = ax.imshow(
         data,
@@ -218,22 +262,52 @@ def make_heatmap_figure(data: np.ndarray, title: str):
     ax.set_title(title)
     ax.set_xlabel("x1 column")
     ax.set_ylabel("x2 row")
+    add_horizontal_layer_boundaries(ax, layer_boundaries, data.shape[0])
     fig.colorbar(image, ax=ax, label="displacement")
     return fig
 
 
-def make_samples_figure(samples: pd.DataFrame, title: str):
+def make_samples_figure(
+    samples: pd.DataFrame, title: str, layer_boundaries: np.ndarray | None = None
+):
     fig, ax = plt.subplots(figsize=(11.2, 6.5))
     for column in samples.columns:
         if column == "x2":
             continue
         ax.plot(samples["x2"], samples[column], label=column)
+    add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_title(title)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
     ax.grid(True, alpha=0.3)
     ax.legend()
     return fig
+
+
+def add_horizontal_layer_boundaries(
+    ax, layer_boundaries: np.ndarray | None, row_count: int
+) -> None:
+    if layer_boundaries is None:
+        return
+    for boundary in layer_boundaries:
+        if 0 < boundary < row_count - 1:
+            ax.axhline(
+                boundary, color="black", linestyle="--", linewidth=0.8, alpha=0.5
+            )
+
+
+def add_vertical_layer_boundaries(ax, layer_boundaries: np.ndarray | None) -> None:
+    if layer_boundaries is None:
+        return
+    for index, boundary in enumerate(layer_boundaries):
+        ax.axvline(
+            boundary,
+            color="black",
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.5,
+            label="layer boundary" if index == 0 else "_nolegend_",
+        )
 
 
 def make_residuals_figure(residuals: pd.DataFrame, title: str):

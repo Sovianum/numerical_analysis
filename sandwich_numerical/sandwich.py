@@ -71,6 +71,8 @@ class Sandwich:
         grad_vec: np.ndarray,
         grid_step: float,
         grad_factors: Sequence[float],
+        gradient_relaxation: float = 1.0,
+        enforce_overlap_continuity: bool = True,
     ) -> None:
         self.block_size = self._validate_block_size(block_size)
         self.block_height = self.block_size[0]
@@ -78,6 +80,14 @@ class Sandwich:
         self.num_mid_blocks = self._validate_num_mid_blocks(num_mid_blocks)
         self.total_blocks = 2 + self.num_mid_blocks
         self.grad_factors = self._validate_grad_factors(grad_factors, self.total_blocks)
+        self.gradient_relaxation = self._validate_relaxation(
+            gradient_relaxation,
+            "gradient_relaxation",
+        )
+        self.enforce_overlap_continuity = self._validate_bool(
+            enforce_overlap_continuity,
+            "enforce_overlap_continuity",
+        )
 
         self.grad_vec = self._validate_grad_vec(
             grad_vec, self.block_height, self.total_blocks
@@ -171,6 +181,22 @@ class Sandwich:
         return numeric_value
 
     @staticmethod
+    def _validate_relaxation(value: float, name: str) -> float:
+        numeric_value = Sandwich._validate_positive_number(value, name)
+
+        if numeric_value > 1:
+            raise ValueError(f"{name} must be less than or equal to 1")
+
+        return numeric_value
+
+    @staticmethod
+    def _validate_bool(value: bool, name: str) -> bool:
+        if not isinstance(value, bool):
+            raise TypeError(f"{name} must be a boolean")
+
+        return value
+
+    @staticmethod
     def _pad_block_size(block_size: tuple[int, int], padding: int) -> tuple[int, int]:
         return (block_size[0] + 2 * padding, block_size[1])
 
@@ -181,6 +207,8 @@ class Sandwich:
         self._set_boundary_conditions()
         self._run_laplace_inward_with_value_transfer()
         self._transfer_gradients_outward()
+        if self.enforce_overlap_continuity:
+            self._enforce_overlap_continuity()
 
     def plot(self, plot_abs: bool = False) -> go.Figure:
         """
@@ -320,9 +348,15 @@ class Sandwich:
     ) -> None:
         gradients = self.blocks[source_index].get_boundary_gradients(source_boundary)
         scale = self._get_grad_scale(source_index, target_index)
-        self.blocks[target_index].set_boundary_gradients(
+        target = self.blocks[target_index]
+        desired_gradients = gradients * scale
+        current_gradients = target.get_boundary_gradients(target_boundary)
+        relaxed_gradients = current_gradients + self.gradient_relaxation * (
+            desired_gradients - current_gradients
+        )
+        target.set_boundary_gradients(
             target_boundary,
-            gradients * scale,
+            relaxed_gradients,
         )
 
     @property
@@ -331,3 +365,29 @@ class Sandwich:
 
     def _get_grad_scale(self, source_block_id: int, target_block_id: int) -> float:
         return self.grad_factors[target_block_id] / self.grad_factors[source_block_id]
+
+    def _enforce_overlap_continuity(self) -> None:
+        last_index = len(self.blocks) - 1
+        for lower_index in range(last_index):
+            upper_index = lower_index + 1
+            lower = self.blocks[lower_index]
+            upper = self.blocks[upper_index]
+
+            lower_top_real = -1 if lower_index == 0 else -2
+            upper_bottom_real = 0 if upper_index == last_index else 1
+
+            if upper_index != last_index:
+                self._average_overlap_rows(lower, lower_top_real, upper, 0)
+            if lower_index != 0:
+                self._average_overlap_rows(lower, -1, upper, upper_bottom_real)
+
+    @staticmethod
+    def _average_overlap_rows(
+        lower: MeshBlock,
+        lower_row: int,
+        upper: MeshBlock,
+        upper_row: int,
+    ) -> None:
+        average = (lower._state[lower_row, :] + upper._state[upper_row, :]) / 2
+        lower._state[lower_row, :] = average
+        upper._state[upper_row, :] = average
