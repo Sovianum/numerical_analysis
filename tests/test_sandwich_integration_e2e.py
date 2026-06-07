@@ -2,12 +2,15 @@
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from sandwich_numerical.integration import (
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
     SANDWICH_RUNS,
     SandwichRun,
+    build_gradient_vector,
     parameters_data_to_df,
     solve_case,
 )
@@ -51,6 +54,34 @@ def test_layer_boundary_sample_coordinates_match_discrete_row_boundaries() -> No
     assert layer_boundary_x2(run).tolist() == pytest.approx(
         [0.1025, 0.2075, 0.3125, 0.4175]
     )
+
+
+def test_parabolic_zero_mean_gradient_profile_matches_formula() -> None:
+    run = SandwichRun(
+        name="parabolic_zero_mean",
+        block_height=7,
+        block_width=10,
+        grid_step=0.25,
+        grad_factors=(1.0, 1.0, 1.0),
+        iterations=0,
+        residual_every=1,
+        progress_every=1,
+        heatmap_columns=10,
+        detail_heatmap_columns=10,
+        sample_x1_positions=(0.0,),
+        gradient_profile=GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+    )
+
+    actual = build_gradient_vector(run)
+    mesh_height = run.block_height * len(run.grad_factors)
+    full_thickness = (mesh_height - 1) * run.grid_step
+    x = np.linspace(-full_thickness / 2, full_thickness / 2, mesh_height)
+    expected = x**2 - full_thickness**2 / 12
+
+    np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-15)
+    np.testing.assert_allclose(actual, actual[::-1], rtol=0, atol=1e-15)
+    analytic_integral = full_thickness**3 / 12 - full_thickness * full_thickness**2 / 12
+    assert analytic_integral == pytest.approx(0.0, abs=1e-15)
 
 
 def assert_numeric_frame_matches_csv(actual: pd.DataFrame, path: Path) -> None:
