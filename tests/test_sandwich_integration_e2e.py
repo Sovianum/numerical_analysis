@@ -80,7 +80,9 @@ def test_parabolic_zero_mean_gradient_profile_matches_formula() -> None:
 
     np.testing.assert_allclose(actual, expected, rtol=0, atol=1e-15)
     np.testing.assert_allclose(actual, actual[::-1], rtol=0, atol=1e-15)
-    analytic_integral = full_thickness**3 / 12 - full_thickness * full_thickness**2 / 12
+    analytic_integral = (
+        full_thickness**3 / 12 - full_thickness * full_thickness**2 / 12
+    )
     assert analytic_integral == pytest.approx(0.0, abs=1e-15)
 
 
