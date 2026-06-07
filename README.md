@@ -10,8 +10,8 @@ This project contains Python implementations of numerical analysis methods, spec
 - `tests/` - Test suite
   - `__init__.py` - Tests package
   - `test_sandwich.py` - Comprehensive pytest test suite
-- `notebooks/` - Jupyter notebooks directory
-  - `Sandwich.ipynb` - Original Jupyter notebook (for reference)
+- `scripts/` - Reproducible command-line runners
+  - `run_sandwich_integration.py` - Generate Sandwich integration CSV/PNG artifacts
 - `sandwich.py` - Root-level implementation with utility functions
 - `pyproject.toml` - Poetry configuration and dependencies
 - `README.md` - This documentation file
@@ -54,14 +54,15 @@ import numpy as np
 
 # Create a gradient vector
 block_size = (10, 10)  # (height, width)
-grad_vec = np.linspace(0, 1, 3 * block_size[0] + 1)
+grad_vec = np.linspace(0, 1, 3 * block_size[0])
 
 # Create and use the Sandwich solver
 mesh = Sandwich(
+    num_mid_blocks=1,
     block_size=block_size,
     grad_vec=grad_vec,
     grid_step=0.1,
-    grad_factors=[1.0]  # Single mid block
+    grad_factors=[1.0, 1.0, 1.0]  # bottom, middle, top
 )
 
 # Run iterations
@@ -90,7 +91,7 @@ poetry run pytest tests/ --cov=sandwich_numerical --cov-report=term-missing
 
 The main class that implements the numerical solver:
 
-- `__init__(block_size, grad_vec, grid_step, grad_factors)` - Initialize with block dimensions, gradient vector, grid step, and list of gradient factors for each mid block
+- `__init__(num_mid_blocks, block_size, grad_vec, grid_step, grad_factors)` - Initialize with block dimensions, gradient vector, grid step, and gradient factors for each block
 - `step()` - Perform one iteration of the numerical method
 - `plot()` - Generate 3D surface plots of the current state
 - `get_residual()` - Calculate the current residual (error)
@@ -210,8 +211,8 @@ numerical_analysis/
 ├── tests/                       # Test suite
 │   ├── __init__.py              # Tests package
 │   └── test_sandwich.py         # Comprehensive pytest tests
-├── notebooks/                   # Jupyter notebooks
-│   └── Sandwich.ipynb           # Original Jupyter notebook
+├── scripts/                     # Command-line runners
+│   └── run_sandwich_integration.py
 ├── .github/                     # GitHub configuration
 │   └── workflows/               # GitHub Actions workflows
 │       └── test.yml             # CI workflow with coverage

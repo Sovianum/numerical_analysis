@@ -173,5 +173,6 @@ ehthumbs.db
 Desktop.ini
 
 # Project specific
+artifacts/
 *.html
 *.log 

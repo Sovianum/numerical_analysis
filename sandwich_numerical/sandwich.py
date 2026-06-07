@@ -1,400 +1,325 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+
 import numpy as np
 import plotly.graph_objects as go
-from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
-from sandwich_numerical.solver.mesh_utils import copy_boundary_gradients, copy_boundary_values
 
+from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
 from .solver.laplace import set_laplace_update
+
+
+def set_boundary_conditions_bottom_block(
+    state: MeshBlock, grad_vec: np.ndarray, grid_step: float
+) -> None:
+    """
+    Set boundary conditions for the bottom block of the sandwich structure.
+
+    This function enforces three types of boundary conditions:
+    1. Fixed boundary: The far end (right side) is clamped to zero
+    2. Zero gradient: The bottom side has zero normal derivative (df/dx2 = 0)
+    3. Prescribed gradient: The near end (left side) has a known gradient
+       from grad_vec
+    """
+
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
+    state.set_boundary_gradients(BoundaryType.BOTTOM, 0)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+
+
+def set_boundary_conditions_top_block(
+    state: MeshBlock, grad_vec: np.ndarray, grid_step: float
+) -> None:
+    """
+    Set boundary conditions for the top block of the sandwich structure.
+
+    This function enforces three types of boundary conditions:
+    1. Fixed boundary: The far end (right side) is clamped to zero
+    2. Zero gradient: The top side has zero normal derivative (df/dx2 = 0)
+    3. Prescribed gradient: The near end (left side) has a known gradient
+       from grad_vec
+    """
+
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
+    state.set_boundary_gradients(BoundaryType.TOP, 0)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+
+
+def set_boundary_conditions_middle_block(
+    state: MeshBlock, grad_vec: np.ndarray, grid_step: float
+) -> None:
+    """
+    Set boundary conditions for a middle block of the sandwich structure.
+
+    This function enforces a fixed far end and a prescribed gradient at the
+    near end. Middle blocks do not have zero-gradient top/bottom boundaries.
+    """
+
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
+    state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
 class Sandwich:
     """
-    A multi-block numerical solver implementing the generalized Sandwich method for differential equations.
-    
-    The generalized Sandwich method divides the computational domain into an arbitrary odd number of blocks:
-    - 1 bottom block
-    - N mid blocks (where N is odd)
-    - 1 top block
-    
-    Each mid block has its own gradient factor, allowing for fine-tuned control over the solution.
-    The solver uses finite difference methods with the Laplace operator and implements
-    various boundary conditions including fixed boundaries, zero gradients, and prescribed gradients.
-    
-    Attributes:
-        block_size (tuple): Size of each block as (height, width)
-        grad_vec (np.ndarray): Vector of prescribed gradients at block boundaries
-        grid_step (float): Grid spacing for finite difference calculations
-        grad_factors (list): List of gradient factors for each block
-        num_mid_blocks (int): Number of middle blocks (must be odd)
-        block_height (int): Height of each block (extracted from block_size)
-        blocks (list): List of all mesh blocks in order: [bottom, mid1, mid2, ..., midN, top]
+    A multi-block numerical solver implementing the generalized Sandwich method.
     """
-    
-    def __init__(self, num_mid_blocks, block_size, grad_vec, grid_step, grad_factors, learning_rate=1.0):
-        """
-        Initialize the generalized Sandwich solver with the specified parameters.
-        
-        Args:
-            block_size (tuple): Size of each block as (height, width)
-            grad_vec (np.ndarray): Vector of prescribed gradients at block boundaries.
-                                  Must have length (2 + num_mid_blocks) * block_height + 1
-            grid_step (float): Grid spacing for finite difference calculations
-            grad_factors (list): List of gradient factors for each block.
-                               Length must be 2 + num_mid_blocks (bottom + mid blocks + top).
-                               Values > 1 increase block gradients, < 1 decrease them.
-            num_mid_blocks (int): Number of middle blocks (must be odd)
-        
-        Note:
-            Each mid block is created with 2 extra rows (top and bottom) to accommodate
-            boundary conditions and data transfer requirements.
-        """
-        self.block_size = block_size
-        self.grad_vec = grad_vec
-        self.grid_step = grid_step
-        self.grad_factors = grad_factors
-        self.num_mid_blocks = num_mid_blocks
-        self.learning_rate = learning_rate
-        # Validate that we have an odd number of mid blocks
-        if self.num_mid_blocks % 2 == 0:
-            raise ValueError("Number of mid blocks must be odd")
-        
-        self.block_height = block_size[0]
-        
-        # Calculate total blocks needed
-        total_blocks = 2 + self.num_mid_blocks  # bottom + mid blocks + top
-        
-        # Validate grad_vec length
-        expected_length = total_blocks * self.block_height
-        if len(grad_vec) != expected_length:
-            raise ValueError(f"grad_vec must have length {expected_length}, got {len(grad_vec)}")
-        
-        # Validate grad_factors length
-        if len(grad_factors) != total_blocks:
-            raise ValueError(f"grad_factors must have length {total_blocks}, got {len(grad_factors)}")
 
-        # Create all blocks
-        self.blocks = []
-        
-        # Bottom block
-        self.blocks.append(MeshBlock(block_size))
-        
-        # Mid blocks (with padding)
-        for i in range(self.num_mid_blocks):
-            self.blocks.append(MeshBlock(self._pad_block_size(block_size, padding=1)))
-        
-        # Top block
-        self.blocks.append(MeshBlock(block_size))
-        
-        # Store references for convenience
+    def __init__(
+        self,
+        num_mid_blocks: int,
+        block_size: tuple[int, int],
+        grad_vec: np.ndarray,
+        grid_step: float,
+        grad_factors: Sequence[float],
+        learning_rate: float = 1.0,
+    ) -> None:
+        self.block_size = self._validate_block_size(block_size)
+        self.block_height = self.block_size[0]
+        self.grid_step = self._validate_positive_number(grid_step, "grid_step")
+        self.learning_rate = self._validate_positive_number(
+            learning_rate, "learning_rate"
+        )
+        self.num_mid_blocks = self._validate_num_mid_blocks(num_mid_blocks)
+        self.total_blocks = 2 + self.num_mid_blocks
+        self.grad_factors = self._validate_grad_factors(grad_factors, self.total_blocks)
+
+        self.grad_vec = self._validate_grad_vec(
+            grad_vec, self.block_height, self.total_blocks
+        )
+
+        self.blocks = [MeshBlock(self.block_size)]
+        self.blocks.extend(
+            MeshBlock(self._pad_block_size(self.block_size, padding=1))
+            for _ in range(self.num_mid_blocks)
+        )
+        self.blocks.append(MeshBlock(self.block_size))
+
         self.bottom = self.blocks[0]
         self.top = self.blocks[-1]
         self.mid_blocks = self.blocks[1:-1]
+        self.mid = self.mid_blocks[0]
 
-    def _pad_block_size(self, block_size: tuple, padding: int) -> tuple:
-        return (block_size[0] + 2*padding, block_size[1])
-        
-    def step(self):
-        """
-        Execute one complete iteration step of the generalized Sandwich solver.
-        
-        This method performs the complete solution cycle:
-        1. Set boundary conditions for all blocks
-        2. Run Laplace step on all blocks
-        3. Get gradients of all blocks
-        4. Transfer saved gradients to adjacent blocks
-        5. Run Laplace step again on all blocks
-        6. Get all boundary values
-        7. Transfer boundary values to adjacent blocks
-        
-        Note:
-            This method modifies the internal state arrays in-place.
-            Call this method repeatedly in a loop to converge to the solution.
-        """
-        self._set_boundary_conditions()
+    @staticmethod
+    def _validate_block_size(block_size: tuple[int, int]) -> tuple[int, int]:
+        if not isinstance(block_size, tuple):
+            raise TypeError("block_size must be a tuple (height, width)")
 
+        if len(block_size) != 2:
+            raise ValueError("block_size must be 2-dimensional (height, width)")
+
+        height, width = block_size
+        if not isinstance(height, int) or not isinstance(width, int):
+            raise TypeError("block_size values must be integers")
+
+        if height < 2 or width < 2:
+            raise ValueError("block_size values must be at least 2")
+
+        return block_size
+
+    @staticmethod
+    def _validate_num_mid_blocks(num_mid_blocks: int) -> int:
+        if not isinstance(num_mid_blocks, int):
+            raise TypeError("num_mid_blocks must be an integer")
+
+        if num_mid_blocks < 1:
+            raise ValueError("Number of mid blocks must be positive")
+
+        if num_mid_blocks % 2 == 0:
+            raise ValueError("Number of mid blocks must be odd")
+
+        return num_mid_blocks
+
+    @staticmethod
+    def _validate_grad_vec(
+        grad_vec: np.ndarray, block_height: int, total_blocks: int
+    ) -> np.ndarray:
+        grad_array = np.asarray(grad_vec, dtype=float)
+        expected_length = total_blocks * block_height
+
+        if grad_array.ndim != 1:
+            raise ValueError("grad_vec must be a 1-dimensional array")
+
+        if grad_array.shape != (expected_length,):
+            raise ValueError(
+                f"grad_vec must have length {expected_length}, "
+                f"got {grad_array.shape[0]}"
+            )
+
+        return grad_array
+
+    @classmethod
+    def _validate_grad_factors(
+        cls, grad_factors: Sequence[float], total_blocks: int
+    ) -> list[float]:
+        factors = [
+            cls._validate_positive_number(value, "grad_factors")
+            for value in grad_factors
+        ]
+
+        if len(factors) != total_blocks:
+            raise ValueError(
+                f"grad_factors must have length {total_blocks}, got {len(factors)}"
+            )
+
+        return factors
+
+    @staticmethod
+    def _validate_positive_number(value: float, name: str) -> float:
+        numeric_value = float(value)
+
+        if not np.isfinite(numeric_value):
+            raise ValueError(f"{name} must be finite")
+
+        if numeric_value <= 0:
+            raise ValueError(f"{name} must be positive")
+
+        return numeric_value
+
+    @staticmethod
+    def _pad_block_size(block_size: tuple[int, int], padding: int) -> tuple[int, int]:
+        return (block_size[0] + 2 * padding, block_size[1])
+
+    def step(self) -> None:
+        """
+        Execute one complete iteration step of the Sandwich solver.
+        """
+        self._set_boundary_conditions_generalized()
         self._run_laplace_on_all_blocks()
-
         self._transfer_saved_gradients_to_adjacent_blocks(
             self._get_gradients_of_all_blocks()
         )
-
         self._run_laplace_on_all_blocks()
-
         self._transfer_boundary_values_to_adjacent_blocks(
             self._get_all_boundary_values()
         )
 
-    def _run_laplace_on_all_blocks(self):
-        """
-        Phase 1: Run Laplace step on all blocks.
-        
-        This method applies the Laplace operator to all blocks in the system.
-        """
-        for block in self.blocks:
-            set_laplace_update(block._state, self.learning_rate)
-
-    def _get_gradients_of_all_blocks(self):
-        """
-        Phase 2: Get gradients of all blocks.
-        
-        This method extracts and stores gradients from all blocks for later transfer.
-        It computes gradients at TOP and BOTTOM boundaries of each block and returns them
-        for use in the gradient transfer phase.
-        
-        Returns:
-            dict: Nested dictionary containing gradients for each block at TOP and BOTTOM boundaries
-        """
-        # Store gradients for each block at TOP and BOTTOM boundaries only
-        stored_gradients = {}
-        
-        for i, block in enumerate(self.blocks):
-            stored_gradients[i] = {}
-            
-            # Extract gradients only at TOP and BOTTOM boundaries for this block
-            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
-                try:
-                    gradients = block.get_boundary_gradients(boundary)
-                    stored_gradients[i][boundary] = gradients.copy()
-                except ValueError:
-                    # Block might be too small for gradients, store None
-                    stored_gradients[i][boundary] = None
-        
-        return stored_gradients
-
-    def _get_all_boundary_values(self):
-        """
-        Get boundary values of all blocks.
-        
-        This method extracts boundary values from all blocks at TOP and BOTTOM boundaries
-        for later transfer to adjacent blocks.
-        
-        Returns:
-            dict: Nested dictionary containing boundary values for each block at TOP and BOTTOM boundaries
-        """
-        # Store boundary values for each block at TOP and BOTTOM boundaries only
-        stored_boundary_values = {}
-        
-        for i, block in enumerate(self.blocks):
-            stored_boundary_values[i] = {}
-            
-            # Extract boundary values only at TOP and BOTTOM boundaries for this block
-            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
-                try:
-                    boundary_values = block.get_boundary_values(boundary)
-                    stored_boundary_values[i][boundary] = boundary_values.copy()
-                except ValueError:
-                    # Block might be too small, store None
-                    stored_boundary_values[i][boundary] = None
-        
-        return stored_boundary_values
-
-    def _transfer_boundary_values_to_adjacent_blocks(self, stored_boundary_values):
-        """
-        Transfer boundary values to adjacent blocks.
-        
-        This method transfers boundary values from each block to its adjacent blocks
-        at the TOP and BOTTOM boundaries.
-        
-        Args:
-            stored_boundary_values (dict): Nested dictionary containing boundary values for each block and boundary
-        """
-        # Transfer boundary values between adjacent blocks
-        for i in range(len(self.blocks) - 1):
-            # Transfer from current block to next block (bottom to top direction)
-            self.blocks[i + 1].set_boundary_values(
-                BoundaryType.BOTTOM, 
-                stored_boundary_values[i][BoundaryType.TOP]
-            )
-            
-            # Transfer from next block to current block (top to bottom direction)
-            self.blocks[i].set_boundary_values(
-                BoundaryType.TOP, 
-                stored_boundary_values[i + 1][BoundaryType.BOTTOM]
-            )
-
-    def _transfer_saved_gradients_to_adjacent_blocks(self, stored_gradients):
-        """
-        Phase 3: Transfer saved gradients to adjacent blocks.
-        
-        This method transfers boundary gradients from each block to its adjacent blocks,
-        using the appropriate gradient scaling factors and the pre-computed gradients.
-        
-        Args:
-            stored_gradients (dict): Nested dictionary containing gradients for each block and boundary
-        """
-        # Transfer gradients between adjacent blocks
-        for i in range(len(self.blocks) - 1):
-            # Transfer from current block to next block (bottom to top direction)
-            grad_scale_forward = self._get_grad_scale(i, i + 1)
-            if grad_scale_forward <= 1: # without this dirty hack gradients are exploding
-                self.blocks[i + 1].set_boundary_gradients(
-                    BoundaryType.BOTTOM, 
-                    stored_gradients[i][BoundaryType.TOP] * grad_scale_forward
-                )
-            
-            # Transfer from next block to current block (top to bottom direction)
-            grad_scale_backward = self._get_grad_scale(i + 1, i)
-            if grad_scale_backward <= 1: # without this dirty hack gradients are exploding
-                self.blocks[i].set_boundary_gradients(
-                    BoundaryType.TOP, 
-                    stored_gradients[i + 1][BoundaryType.BOTTOM] * self._get_grad_scale(i + 1, i)
-                )
-        
-    def plot(self, plot_abs=False):
+    def plot(self, plot_abs: bool = False) -> go.Figure:
         """
         Generate a heatmap visualization of the current displacement field.
-        
-        Args:
-            plot_abs (bool, optional): If True, plot the absolute values of displacement.
-                                     If False (default), plot the raw displacement values.
-        
-        Returns:
-            plotly.graph_objs._figure.Figure: A Plotly heatmap figure showing the
-            displacement field across all blocks.
-        
-        Note:
-            The displacement array is flipped vertically ([::-1]) to match conventional
-            plotting conventions where the origin is at the bottom-left.
         """
         displacement = self.get_displacement_array()[::-1]
-        
+
         if plot_abs:
             displacement = np.abs(displacement)
-        
+
         return go.Figure(data=go.Heatmap(z=displacement))
-    
-    def get_displacement_array(self):
+
+    def get_displacement_array(self) -> np.ndarray:
         """
         Get the complete displacement field across all blocks.
-        
-        Returns:
-            np.ndarray: A concatenated array containing the displacement values
-                       from all blocks in order: bottom, mid1, mid2, ..., midN, top.
-                       Mid blocks exclude the boundary padding rows.
-        
-        Note:
-            The returned array has shape ((2 + num_mid_blocks) * block_height, block_width)
-            and represents the current state of the entire computational domain.
         """
-        displacement_parts = []
-        
-        # Add bottom block
-        displacement_parts.append(self.bottom._state)
-        
-        # Add mid blocks (removing boundary padding)
-        for mid_block in self.mid_blocks:
-            displacement_parts.append(mid_block._state[1:-1])
-        
-        # Add top block
+        displacement_parts = [self.bottom._state]
+        displacement_parts.extend(
+            mid_block._state[1:-1] for mid_block in self.mid_blocks
+        )
         displacement_parts.append(self.top._state)
-        
+
         return np.concatenate(displacement_parts)
-    
-    def get_residual(self):
+
+    def get_residual(self) -> float:
         """
-        Calculate the residual (error) of the current solution.
-        
-        The residual measures how well the current state satisfies the Laplace equation.
-        It is computed as the sum of absolute differences between the current state
-        and what the Laplace operator would predict for that state.
-        
-        Returns:
-            float: The total residual across all blocks. Lower values indicate
-                   better convergence to the solution.
-        
-        Note:
-            The residual is computed only for interior points (excluding boundaries)
-            and summed across all blocks. This value can be used to monitor convergence
-            during iterative solution.
+        Calculate the residual of the current solution.
         """
-        results = []
+        results: list[float] = []
         for block in self.blocks:
             res_block = np.copy(block._state)
             set_laplace_update(res_block)
-            
-            # For mid blocks, exclude padding rows
-            if block in self.mid_blocks:
-                results.append(
-                    np.sum(
-                        np.abs(
-                            block._state[1:-1, 1:-1] - res_block[1:-1, 1:-1]
-                        )
-                    )
-                )
-            else:
-                results.append(
-                    np.sum(
-                        np.abs(
-                            block._state[1:-1, 1:-1] - res_block[1:-1, 1:-1]
-                        )
-                    )
-                )
-            
-        return sum(results)
-        
-    def _set_boundary_conditions(self):
-        """
-        Set boundary conditions for all blocks.
-        
-        This private method applies the appropriate boundary conditions to each block:
-        - Bottom block: Uses first block_height elements of grad_vec
-        - Mid blocks: Use elements from their respective ranges of grad_vec
-        - Top block: Uses remaining elements of grad_vec
-        
-        Note:
-            This method modifies the next_state arrays in-place by calling the
-            appropriate boundary condition functions for each block.
-        """
-        # Set boundary conditions for bottom block
-        self._set_boundary_conditions_bottom_block(
-            self.bottom, 
-            self._get_block_grad_vec(block_id=0, padding=0), 
-            self.grid_step
-        )
-        
-        # Set boundary conditions for mid blocks
-        for i, mid_block in enumerate(self.mid_blocks):
-            self._set_boundary_conditions_middle_block(
-                mid_block, 
-                self._get_block_grad_vec(block_id=i+1, padding=1), 
-                self.grid_step
+
+            results.append(
+                float(np.sum(np.abs(block._state[1:-1, 1:-1] - res_block[1:-1, 1:-1])))
             )
-        
-        # Set boundary conditions for top block
-        self._set_boundary_conditions_top_block(
-            self.top, 
-            self._get_block_grad_vec(block_id=len(self.blocks)-1, padding=0), 
-            self.grid_step
+
+        return sum(results)
+
+    def _set_boundary_conditions_generalized(self) -> None:
+        set_boundary_conditions_bottom_block(
+            self.bottom,
+            self._get_block_grad_vec(block_id=0, padding=0),
+            self.grid_step,
+        )
+
+        for block_id, mid_block in enumerate(self.mid_blocks, start=1):
+            set_boundary_conditions_middle_block(
+                mid_block,
+                self._get_block_grad_vec(block_id=block_id, padding=1),
+                self.grid_step,
+            )
+
+        set_boundary_conditions_top_block(
+            self.top,
+            self._get_block_grad_vec(block_id=len(self.blocks) - 1, padding=0),
+            self.grid_step,
         )
 
     def _get_block_grad_vec(self, block_id: int, padding: int) -> np.ndarray:
-        left_idx = block_id*self.block_height - padding
-        right_idx = (block_id + 1)*self.block_height + padding
+        left_idx = block_id * self.block_height - padding
+        right_idx = (block_id + 1) * self.block_height + padding
 
         return self.grad_vec[left_idx:right_idx]
 
-    def _set_boundary_conditions_bottom_block(self, state: MeshBlock, 
-                                        grad_vec: np.ndarray, grid_step: float):
-        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-        state.set_boundary_gradients(BoundaryType.BOTTOM, 0) # df/dx2 = 0 on the bottom side
-        
-        # gradients are known on the near end
-        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+    def _run_laplace_on_all_blocks(self) -> None:
+        for block in self.blocks:
+            set_laplace_update(block._state, self.learning_rate)
 
-    def _set_boundary_conditions_middle_block(self, state: MeshBlock,
-                                        grad_vec: np.ndarray, grid_step: float):
+    def _get_gradients_of_all_blocks(
+        self,
+    ) -> dict[int, dict[BoundaryType, np.ndarray]]:
+        stored_gradients: dict[int, dict[BoundaryType, np.ndarray]] = {}
 
-        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-        
-        # gradients are known on the near end
-        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
+        for index, block in enumerate(self.blocks):
+            stored_gradients[index] = {}
+            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
+                stored_gradients[index][boundary] = block.get_boundary_gradients(
+                    boundary
+                )
 
-    def _set_boundary_conditions_top_block(self, state: MeshBlock, 
-                                        grad_vec: np.ndarray, grid_step: float):
-        state.set_boundary_values(BoundaryType.RIGHT, 0) # the block is fixed on the far end
-        state.set_boundary_gradients(BoundaryType.TOP, 0) # df/dx2 = 0 on the top side
-        
-        # gradients are known on the near end
-        state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
-        
+        return stored_gradients
+
+    def _get_all_boundary_values(
+        self,
+    ) -> dict[int, dict[BoundaryType, np.ndarray]]:
+        stored_boundary_values: dict[int, dict[BoundaryType, np.ndarray]] = {}
+
+        for index, block in enumerate(self.blocks):
+            stored_boundary_values[index] = {}
+            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
+                stored_boundary_values[index][boundary] = block.get_boundary_values(
+                    boundary
+                )
+
+        return stored_boundary_values
+
+    def _transfer_boundary_values_to_adjacent_blocks(
+        self, stored_boundary_values: dict[int, dict[BoundaryType, np.ndarray]]
+    ) -> None:
+        for index in range(len(self.blocks) - 1):
+            self.blocks[index + 1].set_boundary_values(
+                BoundaryType.BOTTOM,
+                stored_boundary_values[index][BoundaryType.TOP],
+            )
+            self.blocks[index].set_boundary_values(
+                BoundaryType.TOP,
+                stored_boundary_values[index + 1][BoundaryType.BOTTOM],
+            )
+
+    def _transfer_saved_gradients_to_adjacent_blocks(
+        self, stored_gradients: dict[int, dict[BoundaryType, np.ndarray]]
+    ) -> None:
+        for index in range(len(self.blocks) - 1):
+            grad_scale_forward = self._get_grad_scale(index, index + 1)
+            if grad_scale_forward <= 1:
+                self.blocks[index + 1].set_boundary_gradients(
+                    BoundaryType.BOTTOM,
+                    stored_gradients[index][BoundaryType.TOP] * grad_scale_forward,
+                )
+
+            grad_scale_backward = self._get_grad_scale(index + 1, index)
+            if grad_scale_backward <= 1:
+                self.blocks[index].set_boundary_gradients(
+                    BoundaryType.TOP,
+                    stored_gradients[index + 1][BoundaryType.BOTTOM]
+                    * grad_scale_backward,
+                )
+
     def _get_grad_scale(self, block_id_curr: int, block_id_next: int) -> float:
         return self.grad_factors[block_id_curr] / self.grad_factors[block_id_next]
