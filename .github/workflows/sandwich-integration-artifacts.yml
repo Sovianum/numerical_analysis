@@ -8,7 +8,7 @@ on:
 jobs:
   generate:
     if: github.event.pull_request.merged == true
-    name: ${{ matrix.scenario_name }}
+    name: ${{ matrix.case }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
 
@@ -16,30 +16,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - case: grad_factors_1_1_1
-            gradient_profile: sine
-            scenario_name: grad_factors_1_1_1_load_sin
-            artifact_name: sandwich-integration-grad-factors-1-1-1-load-sin
-          - case: grad_factors_1_1_1
-            gradient_profile: parabolic_zero_mean
-            scenario_name: grad_factors_1_1_1_load_parabolic
-            artifact_name: sandwich-integration-grad-factors-1-1-1-load-parabolic
-          - case: grad_factors_1_1000_1
-            gradient_profile: sine
-            scenario_name: grad_factors_1_1000_1_load_sin
-            artifact_name: sandwich-integration-grad-factors-1-1000-1-load-sin
-          - case: grad_factors_1_1000_1
-            gradient_profile: parabolic_zero_mean
-            scenario_name: grad_factors_1_1000_1_load_parabolic
-            artifact_name: sandwich-integration-grad-factors-1-1000-1-load-parabolic
-          - case: grad_factors_1000_1_1000_1_1000
-            gradient_profile: sine
-            scenario_name: grad_factors_1000_1_1000_1_1000_load_sin
-            artifact_name: sandwich-integration-grad-factors-1000-1-1000-1-1000-load-sin
-          - case: grad_factors_1000_1_1000_1_1000
-            gradient_profile: parabolic_zero_mean
-            scenario_name: grad_factors_1000_1_1000_1_1000_load_parabolic
-            artifact_name: sandwich-integration-grad-factors-1000-1-1000-1-1000-load-parabolic
+          - case: grad_factors_1_1_1_load_sin
+          - case: grad_factors_1_1_1_load_parabolic
+          - case: grad_factors_1_1000_1_load_sin
+          - case: grad_factors_1_1000_1_load_parabolic
+          - case: grad_factors_1000_1_1000_1_1000_load_sin
+          - case: grad_factors_1000_1_1000_1_1000_load_parabolic
 
     steps:
       - uses: actions/checkout@v4
@@ -76,13 +58,12 @@ jobs:
         run: |
           poetry run python scripts/run_sandwich_integration.py \
             --case "${{ matrix.case }}" \
-            --gradient-profile "${{ matrix.gradient_profile }}" \
             --output-dir artifacts/sandwich_integration
 
       - name: Upload Sandwich integration artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: artifacts/sandwich_integration/${{ matrix.scenario_name }}
+          name: sandwich-integration-${{ matrix.case }}
+          path: artifacts/sandwich_integration/${{ matrix.case }}
           if-no-files-found: error
           retention-days: 30

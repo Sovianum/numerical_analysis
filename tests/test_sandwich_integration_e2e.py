@@ -124,6 +124,48 @@ def test_prepare_runs_adds_load_shape_to_name_for_explicit_profile(
 
 
 @pytest.mark.parametrize(
+    ("case_name", "expected_gradient_profile"),
+    [
+        ("grad_factors_1_1_1_load_sin", GRADIENT_PROFILE_SINE),
+        (
+            "grad_factors_1_1_1_load_parabolic",
+            GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+        ),
+    ],
+)
+def test_prepare_runs_accepts_load_specific_case_names(
+    case_name: str, expected_gradient_profile: str
+) -> None:
+    args = argparse.Namespace(
+        case=[case_name],
+        iterations=None,
+        block_width=None,
+        gradient_relaxation=None,
+        gradient_profile=None,
+        enforce_overlap_continuity=None,
+    )
+
+    (run,) = prepare_runs(args)
+
+    assert run.name == case_name
+    assert run.gradient_profile == expected_gradient_profile
+
+
+def test_prepare_runs_rejects_mismatched_load_specific_case_profile() -> None:
+    args = argparse.Namespace(
+        case=["grad_factors_1_1_1_load_sin"],
+        iterations=None,
+        block_width=None,
+        gradient_relaxation=None,
+        gradient_profile=GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+        enforce_overlap_continuity=None,
+    )
+
+    with pytest.raises(SystemExit, match="implies gradient profile"):
+        prepare_runs(args)
+
+
+@pytest.mark.parametrize(
     "data",
     [
         np.array([[-2.0, 0.0, 1.0]]),
