@@ -38,6 +38,7 @@ from sandwich_numerical.integration import (
 
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
+DISPLACEMENT_CMAP = "bwr"
 
 
 def main() -> None:
@@ -262,7 +263,7 @@ def make_heatmap_figure(
     image = ax.imshow(
         data,
         aspect="auto",
-        cmap="RdBu_r",
+        cmap=DISPLACEMENT_CMAP,
         norm=make_displacement_norm(data),
         origin="lower",
     )
@@ -333,10 +334,10 @@ def make_displacement_norm(data: np.ndarray):
         return None
     min_value = float(finite.min())
     max_value = float(finite.max())
-    if min_value < 0 < max_value:
-        limit = max(abs(min_value), abs(max_value))
-        return TwoSlopeNorm(vmin=-limit, vcenter=0, vmax=limit)
-    return None
+    limit = max(abs(min_value), abs(max_value))
+    if limit == 0:
+        limit = 1.0
+    return TwoSlopeNorm(vmin=-limit, vcenter=0, vmax=limit)
 
 
 def write_figure_png(
