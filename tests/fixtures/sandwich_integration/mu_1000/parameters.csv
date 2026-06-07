@@ -1,0 +1,2 @@
+name,block_height,block_width,grid_step,mu,iterations,residual_every,progress_every,heatmap_columns,detail_heatmap_columns,sample_x1_positions,gradient_profile
+mu_1000,21,3000,0.005,1000.0,10000,1000,1000,1000,100,"(0.0, 0.2, 0.4, 1.0)",sine
