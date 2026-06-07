@@ -5,7 +5,110 @@ Tests for the Sandwich numerical analysis package.
 import numpy as np
 import pytest
 
-from sandwich_numerical.sandwich import Sandwich
+from sandwich_numerical.sandwich import (
+    Sandwich,
+    set_boundary_conditions_bottom_block,
+    set_boundary_conditions_middle_block,
+    set_boundary_conditions_top_block,
+)
+from sandwich_numerical.solver.laplace import set_laplace_update
+from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
+from sandwich_numerical.solver.mesh_utils import (
+    copy_boundary_gradients,
+    copy_boundary_values,
+)
+
+
+class ReferenceThreeLayerSandwich:
+    """Reference implementation of the pre-generalized three-layer step."""
+
+    def __init__(
+        self,
+        block_size: tuple[int, int],
+        grad_vec: np.ndarray,
+        grid_step: float,
+        grad_factor: float,
+    ) -> None:
+        self.block_size = block_size
+        self.block_height = block_size[0]
+        self.grad_vec = grad_vec
+        self.grid_step = grid_step
+        self.grad_factor = grad_factor
+
+        self.bottom = MeshBlock(block_size)
+        self.mid = MeshBlock((block_size[0] + 2, block_size[1]))
+        self.top = MeshBlock(block_size)
+        self.blocks = [self.bottom, self.mid, self.top]
+
+    def step(self) -> None:
+        set_boundary_conditions_bottom_block(
+            self.bottom,
+            self.grad_vec[: self.block_height],
+            self.grid_step,
+        )
+        set_boundary_conditions_middle_block(
+            self.mid,
+            self.grad_vec[self.block_height - 1 : 2 * self.block_height + 1],
+            self.grid_step,
+        )
+        set_boundary_conditions_top_block(
+            self.top,
+            self.grad_vec[2 * self.block_height : 3 * self.block_height],
+            self.grid_step,
+        )
+
+        set_laplace_update(self.bottom._state)
+        set_laplace_update(self.top._state)
+
+        copy_boundary_values(
+            self.bottom,
+            BoundaryType.TOP,
+            self.mid,
+            BoundaryType.BOTTOM,
+        )
+        copy_boundary_values(
+            self.top,
+            BoundaryType.BOTTOM,
+            self.mid,
+            BoundaryType.TOP,
+        )
+
+        set_laplace_update(self.mid._state)
+
+        grad_scale = 1 / self.grad_factor
+        copy_boundary_gradients(
+            self.mid,
+            BoundaryType.BOTTOM,
+            self.bottom,
+            BoundaryType.TOP,
+            grad_scale,
+        )
+        copy_boundary_gradients(
+            self.mid,
+            BoundaryType.TOP,
+            self.top,
+            BoundaryType.BOTTOM,
+            grad_scale,
+        )
+
+    def get_displacement_array(self) -> np.ndarray:
+        return np.concatenate(
+            (
+                self.bottom._state,
+                self.mid._state[1:-1],
+                self.top._state,
+            )
+        )
+
+    def get_residual(self) -> float:
+        results = []
+        for block in self.blocks:
+            res_block = np.copy(block._state)
+            set_laplace_update(res_block)
+            results.append(
+                float(np.sum(np.abs(block._state[1:-1, 1:-1] - res_block[1:-1, 1:-1])))
+            )
+        return sum(results)
 
 
 class TestSandwich:
@@ -97,6 +200,43 @@ class TestSandwich:
         assert initial_residual == 0.0
         assert new_residual > 0.0
         assert isinstance(new_residual, (int, float))
+
+    @pytest.mark.parametrize("grad_factor", [1.0, 1000.0])
+    def test_three_layer_solver_matches_reference(self, grad_factor):
+        """Generalized one-middle-block mode must reproduce the old solver."""
+        block_size = (7, 11)
+        grid_step = 0.05
+        mesh_height = 3 * block_size[0]
+        grad_vec = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+
+        reference = ReferenceThreeLayerSandwich(
+            block_size=block_size,
+            grad_vec=grad_vec,
+            grid_step=grid_step,
+            grad_factor=grad_factor,
+        )
+        generalized = Sandwich(
+            num_mid_blocks=1,
+            block_size=block_size,
+            grad_vec=grad_vec,
+            grid_step=grid_step,
+            grad_factors=[1.0, grad_factor, 1.0],
+        )
+
+        for _ in range(25):
+            reference.step()
+            generalized.step()
+
+        np.testing.assert_allclose(
+            generalized.get_displacement_array(),
+            reference.get_displacement_array(),
+            rtol=0,
+            atol=1e-15,
+        )
+        assert generalized.get_residual() == pytest.approx(
+            reference.get_residual(),
+            abs=1e-15,
+        )
 
     def test_displacement_array(self, sample_mesh):
         """Test that displacement array has correct shape."""

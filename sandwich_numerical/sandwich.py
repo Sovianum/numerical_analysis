@@ -184,14 +184,8 @@ class Sandwich:
         Execute one complete iteration step of the Sandwich solver.
         """
         self._set_boundary_conditions_generalized()
-        self._run_laplace_on_all_blocks()
-        self._transfer_saved_gradients_to_adjacent_blocks(
-            self._get_gradients_of_all_blocks()
-        )
-        self._run_laplace_on_all_blocks()
-        self._transfer_boundary_values_to_adjacent_blocks(
-            self._get_all_boundary_values()
-        )
+        self._run_laplace_inward_with_value_transfer()
+        self._transfer_gradients_outward()
 
     def plot(self, plot_abs: bool = False) -> go.Figure:
         """
@@ -257,69 +251,91 @@ class Sandwich:
 
         return self.grad_vec[left_idx:right_idx]
 
-    def _run_laplace_on_all_blocks(self) -> None:
-        for block in self.blocks:
-            set_laplace_update(block._state, self.learning_rate)
+    def _run_laplace_inward_with_value_transfer(self) -> None:
+        center_index = self._center_block_index
+        last_index = len(self.blocks) - 1
 
-    def _get_gradients_of_all_blocks(
-        self,
-    ) -> dict[int, dict[BoundaryType, np.ndarray]]:
-        stored_gradients: dict[int, dict[BoundaryType, np.ndarray]] = {}
+        for distance_from_edge in range(center_index):
+            lower_index = distance_from_edge
+            upper_index = last_index - distance_from_edge
 
-        for index, block in enumerate(self.blocks):
-            stored_gradients[index] = {}
-            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
-                stored_gradients[index][boundary] = block.get_boundary_gradients(
-                    boundary
-                )
-
-        return stored_gradients
-
-    def _get_all_boundary_values(
-        self,
-    ) -> dict[int, dict[BoundaryType, np.ndarray]]:
-        stored_boundary_values: dict[int, dict[BoundaryType, np.ndarray]] = {}
-
-        for index, block in enumerate(self.blocks):
-            stored_boundary_values[index] = {}
-            for boundary in [BoundaryType.TOP, BoundaryType.BOTTOM]:
-                stored_boundary_values[index][boundary] = block.get_boundary_values(
-                    boundary
-                )
-
-        return stored_boundary_values
-
-    def _transfer_boundary_values_to_adjacent_blocks(
-        self, stored_boundary_values: dict[int, dict[BoundaryType, np.ndarray]]
-    ) -> None:
-        for index in range(len(self.blocks) - 1):
-            self.blocks[index + 1].set_boundary_values(
-                BoundaryType.BOTTOM,
-                stored_boundary_values[index][BoundaryType.TOP],
+            set_laplace_update(
+                self.blocks[lower_index]._state,
+                self.learning_rate,
             )
-            self.blocks[index].set_boundary_values(
-                BoundaryType.TOP,
-                stored_boundary_values[index + 1][BoundaryType.BOTTOM],
+            set_laplace_update(
+                self.blocks[upper_index]._state,
+                self.learning_rate,
             )
 
-    def _transfer_saved_gradients_to_adjacent_blocks(
-        self, stored_gradients: dict[int, dict[BoundaryType, np.ndarray]]
+            self._copy_boundary_values(
+                source_index=lower_index,
+                source_boundary=BoundaryType.TOP,
+                target_index=lower_index + 1,
+                target_boundary=BoundaryType.BOTTOM,
+            )
+            self._copy_boundary_values(
+                source_index=upper_index,
+                source_boundary=BoundaryType.BOTTOM,
+                target_index=upper_index - 1,
+                target_boundary=BoundaryType.TOP,
+            )
+
+        set_laplace_update(
+            self.blocks[center_index]._state,
+            self.learning_rate,
+        )
+
+    def _transfer_gradients_outward(self) -> None:
+        center_index = self._center_block_index
+        last_index = len(self.blocks) - 1
+
+        for distance_from_edge in range(center_index - 1, -1, -1):
+            lower_source_index = distance_from_edge + 1
+            lower_target_index = distance_from_edge
+            upper_source_index = last_index - distance_from_edge - 1
+            upper_target_index = last_index - distance_from_edge
+
+            self._copy_boundary_gradients(
+                source_index=lower_source_index,
+                source_boundary=BoundaryType.BOTTOM,
+                target_index=lower_target_index,
+                target_boundary=BoundaryType.TOP,
+            )
+            self._copy_boundary_gradients(
+                source_index=upper_source_index,
+                source_boundary=BoundaryType.TOP,
+                target_index=upper_target_index,
+                target_boundary=BoundaryType.BOTTOM,
+            )
+
+    def _copy_boundary_values(
+        self,
+        source_index: int,
+        source_boundary: BoundaryType,
+        target_index: int,
+        target_boundary: BoundaryType,
     ) -> None:
-        for index in range(len(self.blocks) - 1):
-            grad_scale_forward = self._get_grad_scale(index, index + 1)
-            if grad_scale_forward <= 1:
-                self.blocks[index + 1].set_boundary_gradients(
-                    BoundaryType.BOTTOM,
-                    stored_gradients[index][BoundaryType.TOP] * grad_scale_forward,
-                )
+        values = self.blocks[source_index].get_boundary_values(source_boundary)
+        self.blocks[target_index].set_boundary_values(target_boundary, values)
 
-            grad_scale_backward = self._get_grad_scale(index + 1, index)
-            if grad_scale_backward <= 1:
-                self.blocks[index].set_boundary_gradients(
-                    BoundaryType.TOP,
-                    stored_gradients[index + 1][BoundaryType.BOTTOM]
-                    * grad_scale_backward,
-                )
+    def _copy_boundary_gradients(
+        self,
+        source_index: int,
+        source_boundary: BoundaryType,
+        target_index: int,
+        target_boundary: BoundaryType,
+    ) -> None:
+        gradients = self.blocks[source_index].get_boundary_gradients(source_boundary)
+        scale = self._get_grad_scale(source_index, target_index)
+        self.blocks[target_index].set_boundary_gradients(
+            target_boundary,
+            gradients * scale,
+        )
 
-    def _get_grad_scale(self, block_id_curr: int, block_id_next: int) -> float:
-        return self.grad_factors[block_id_curr] / self.grad_factors[block_id_next]
+    @property
+    def _center_block_index(self) -> int:
+        return len(self.blocks) // 2
+
+    def _get_grad_scale(self, source_block_id: int, target_block_id: int) -> float:
+        return self.grad_factors[target_block_id] / self.grad_factors[source_block_id]
