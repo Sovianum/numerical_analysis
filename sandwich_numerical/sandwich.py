@@ -72,7 +72,7 @@ class Sandwich:
         grid_step: float,
         grad_factors: Sequence[float],
         gradient_relaxation: float = 1.0,
-        enforce_overlap_continuity: bool = False,
+        enforce_overlap_continuity: bool = True,
     ) -> None:
         self.block_size = self._validate_block_size(block_size)
         self.block_height = self.block_size[0]

@@ -154,7 +154,7 @@ class TestSandwich:
         assert sample_mesh.grid_step == 0.1
         assert sample_mesh.grad_factors == [1.0, 1.0, 1.0]
         assert sample_mesh.gradient_relaxation == 1.0
-        assert sample_mesh.enforce_overlap_continuity is False
+        assert sample_mesh.enforce_overlap_continuity is True
         assert sample_mesh.num_mid_blocks == 1
         assert sample_mesh.grad_vec.shape == (30,)
 
@@ -222,6 +222,7 @@ class TestSandwich:
             grad_vec=grad_vec,
             grid_step=grid_step,
             grad_factors=[1.0, grad_factor, 1.0],
+            enforce_overlap_continuity=False,
         )
 
         for _ in range(25):

@@ -90,10 +90,19 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help="Under-relaxation for copied interface gradients.",
     )
-    parser.add_argument(
+    overlap_group = parser.add_mutually_exclusive_group()
+    overlap_group.add_argument(
         "--enforce-overlap-continuity",
+        dest="enforce_overlap_continuity",
         action="store_true",
+        default=None,
         help="Average duplicate real/ghost rows shared by adjacent blocks.",
+    )
+    overlap_group.add_argument(
+        "--no-enforce-overlap-continuity",
+        dest="enforce_overlap_continuity",
+        action="store_false",
+        help="Disable averaging of duplicate real/ghost rows.",
     )
     parser.add_argument(
         "--csv-only",
@@ -133,8 +142,8 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             )
         if args.gradient_relaxation is not None:
             replacements["gradient_relaxation"] = args.gradient_relaxation
-        if args.enforce_overlap_continuity:
-            replacements["enforce_overlap_continuity"] = True
+        if args.enforce_overlap_continuity is not None:
+            replacements["enforce_overlap_continuity"] = args.enforce_overlap_continuity
         prepared.append(dataclasses.replace(run, **replacements))
 
     if not prepared:
