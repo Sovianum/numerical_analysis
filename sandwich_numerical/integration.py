@@ -19,7 +19,7 @@ class SandwichRun:
     block_height: int
     block_width: int
     grid_step: float
-    mu: float
+    grad_factors: tuple[float, ...]
     iterations: int
     residual_every: int
     progress_every: int
@@ -41,11 +41,11 @@ ProgressCallback = Callable[[int, float | None], None]
 
 SANDWICH_RUNS: tuple[SandwichRun, ...] = (
     SandwichRun(
-        name="mu_1",
+        name="grad_factors_1_1_1",
         block_height=21,
         block_width=3000,
         grid_step=0.005,
-        mu=1.0,
+        grad_factors=(1.0, 1.0, 1.0),
         iterations=10_000,
         residual_every=1_000,
         progress_every=1_000,
@@ -54,11 +54,11 @@ SANDWICH_RUNS: tuple[SandwichRun, ...] = (
         sample_x1_positions=(0.0, 0.2, 0.4, 1.0),
     ),
     SandwichRun(
-        name="mu_1000",
+        name="grad_factors_1_1000_1",
         block_height=21,
         block_width=3000,
         grid_step=0.005,
-        mu=1_000.0,
+        grad_factors=(1.0, 1_000.0, 1.0),
         iterations=10_000,
         residual_every=1_000,
         progress_every=1_000,
@@ -110,15 +110,16 @@ def solve_case(
 
 def create_sandwich(run: SandwichRun) -> Sandwich:
     return Sandwich(
+        num_mid_blocks=len(run.grad_factors) - 2,
         block_size=(run.block_height, run.block_width),
         grad_vec=build_gradient_vector(run),
         grid_step=run.grid_step,
-        grad_factor=run.mu,
+        grad_factors=run.grad_factors,
     )
 
 
 def build_gradient_vector(run: SandwichRun) -> np.ndarray:
-    mesh_height = run.block_height * 3
+    mesh_height = run.block_height * len(run.grad_factors)
     if run.gradient_profile != "sine":
         raise ValueError(f"Unsupported gradient profile: {run.gradient_profile}")
     gradient = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
@@ -155,7 +156,9 @@ def displacement_data_to_df(run: SandwichRun, displacement: np.ndarray) -> pd.Da
 
 
 def parameters_data_to_df(run: SandwichRun) -> pd.DataFrame:
-    return pd.DataFrame([dataclasses.asdict(run)])
+    result = pd.DataFrame([dataclasses.asdict(run)])
+    result["grad_factors"] = result["grad_factors"].astype(str)
+    return result
 
 
 def write_solution_csvs(

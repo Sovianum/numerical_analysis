@@ -1,11 +1,11 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+
 import numpy as np
 import plotly.graph_objects as go
-from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
-from sandwich_numerical.solver.mesh_utils import (
-    copy_boundary_gradients,
-    copy_boundary_values,
-)
 
+from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
 from .solver.laplace import set_laplace_update
 
 
@@ -20,23 +20,10 @@ def set_boundary_conditions_bottom_block(
     2. Zero gradient: The bottom side has zero normal derivative (df/dx2 = 0)
     3. Prescribed gradient: The near end (left side) has a known gradient
        from grad_vec
-
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient
-            at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-
-    Note:
-        The function modifies state in-place by setting boundary values.
     """
 
-    state.set_boundary_values(
-        BoundaryType.RIGHT, 0
-    )  # the block is fixed on the far end
-    state.set_boundary_gradients(BoundaryType.BOTTOM, 0)  # df/dx2 = 0
-
-    # gradients are known on the near end
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
+    state.set_boundary_gradients(BoundaryType.BOTTOM, 0)
     state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
@@ -51,23 +38,10 @@ def set_boundary_conditions_top_block(
     2. Zero gradient: The top side has zero normal derivative (df/dx2 = 0)
     3. Prescribed gradient: The near end (left side) has a known gradient
        from grad_vec
-
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient
-            at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-
-    Note:
-        The function modifies state in-place by setting boundary values.
     """
 
-    state.set_boundary_values(
-        BoundaryType.RIGHT, 0
-    )  # the block is fixed on the far end
-    state.set_boundary_gradients(BoundaryType.TOP, 0)  # df/dx2 = 0
-
-    # gradients are known on the near end
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
+    state.set_boundary_gradients(BoundaryType.TOP, 0)
     state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
@@ -75,92 +49,50 @@ def set_boundary_conditions_middle_block(
     state: MeshBlock, grad_vec: np.ndarray, grid_step: float
 ) -> None:
     """
-    Set boundary conditions for the middle block of the sandwich structure.
+    Set boundary conditions for a middle block of the sandwich structure.
 
-    This function enforces two types of boundary conditions:
-    1. Fixed boundary: The far end (right side) is clamped to zero
-    2. Prescribed gradient: The near end (left side) has a known gradient
-       from grad_vec
-
-    Args:
-        state (MeshBlock): Current state mesh block
-        grad_vec (np.ndarray): Gradient vector specifying the prescribed gradient
-            at the near end
-        grid_step (float): Grid spacing for finite difference calculations
-
-    Note:
-        The function modifies next_state in-place by setting boundary values.
-        The middle block has no zero-gradient conditions on top/bottom sides.
+    This function enforces a fixed far end and a prescribed gradient at the
+    near end. Middle blocks do not have zero-gradient top/bottom boundaries.
     """
 
-    state.set_boundary_values(
-        BoundaryType.RIGHT, 0
-    )  # the block is fixed on the far end
-
-    # gradients are known on the near end
+    state.set_boundary_values(BoundaryType.RIGHT, 0)
     state.set_boundary_gradients(BoundaryType.LEFT, grad_vec * grid_step)
 
 
 class Sandwich:
     """
-    A multi-block numerical solver implementing the Sandwich method.
-
-    The Sandwich method divides the computational domain into three blocks
-    (bottom, middle, top) and solves them iteratively with data transfer between
-    blocks. This approach allows for efficient solution of large-scale problems
-    by breaking them into manageable sub-problems while maintaining solution
-    continuity across block boundaries.
-
-    The solver uses finite difference methods with the Laplace operator and implements
-    various boundary conditions including fixed boundaries, zero gradients, and
-    prescribed gradients.
-
-    Attributes:
-        block_size (tuple): Size of each block as (height, width)
-        grad_vec (np.ndarray): Vector of prescribed gradients at block boundaries
-        grid_step (float): Grid spacing for finite difference calculations
-        grad_factor (float): Factor for scaling gradients in the middle block
-        block_height (int): Height of each block (extracted from block_size)
-        curr_state_* (np.ndarray): Current state arrays for each block
-        next_state_* (np.ndarray): Next state arrays for each block (working arrays)
+    A multi-block numerical solver implementing the generalized Sandwich method.
     """
 
     def __init__(
         self,
+        num_mid_blocks: int,
         block_size: tuple[int, int],
         grad_vec: np.ndarray,
         grid_step: float,
-        grad_factor: float,
+        grad_factors: Sequence[float],
     ) -> None:
-        """
-        Initialize the Sandwich solver with the specified parameters.
-
-        Args:
-            block_size (tuple): Size of each block as (height, width)
-            grad_vec (np.ndarray): Vector of prescribed gradients at block boundaries.
-                                  Must have length 3*block_height.
-            grid_step (float): Grid spacing for finite difference calculations
-            grad_factor (float): Factor for scaling gradients in the middle block.
-                               Values > 1 increase middle block gradients,
-                               < 1 decrease them.
-
-        Note:
-            The middle block is created with 2 extra rows (top and bottom) to
-            accommodate boundary conditions and data transfer requirements.
-        """
         self.block_size = self._validate_block_size(block_size)
         self.block_height = self.block_size[0]
-        self.grad_vec = self._validate_grad_vec(grad_vec, self.block_height)
         self.grid_step = self._validate_positive_number(grid_step, "grid_step")
-        self.grad_factor = self._validate_positive_number(grad_factor, "grad_factor")
+        self.num_mid_blocks = self._validate_num_mid_blocks(num_mid_blocks)
+        self.total_blocks = 2 + self.num_mid_blocks
+        self.grad_factors = self._validate_grad_factors(grad_factors, self.total_blocks)
 
-        # Current state blocks
-        self.top = MeshBlock(self.block_size)
-        self.bottom = MeshBlock(self.block_size)
+        self.grad_vec = self._validate_grad_vec(
+            grad_vec, self.block_height, self.total_blocks
+        )
 
-        # we need one more row from each side because of boundary conditions
-        mid_block_size = (self.block_size[0] + 2, self.block_size[1])
-        self.mid = MeshBlock(mid_block_size)
+        self.blocks = [MeshBlock(self.block_size)]
+        self.blocks.extend(
+            MeshBlock(self._pad_block_size(self.block_size, padding=1))
+            for _ in range(self.num_mid_blocks)
+        )
+        self.blocks.append(MeshBlock(self.block_size))
+
+        self.bottom = self.blocks[0]
+        self.top = self.blocks[-1]
+        self.mid_blocks = self.blocks[1:-1]
 
     @staticmethod
     def _validate_block_size(block_size: tuple[int, int]) -> tuple[int, int]:
@@ -180,20 +112,51 @@ class Sandwich:
         return block_size
 
     @staticmethod
-    def _validate_grad_vec(grad_vec: np.ndarray, block_height: int) -> np.ndarray:
+    def _validate_num_mid_blocks(num_mid_blocks: int) -> int:
+        if not isinstance(num_mid_blocks, int):
+            raise TypeError("num_mid_blocks must be an integer")
+
+        if num_mid_blocks < 1:
+            raise ValueError("Number of mid blocks must be positive")
+
+        if num_mid_blocks % 2 == 0:
+            raise ValueError("Number of mid blocks must be odd")
+
+        return num_mid_blocks
+
+    @staticmethod
+    def _validate_grad_vec(
+        grad_vec: np.ndarray, block_height: int, total_blocks: int
+    ) -> np.ndarray:
         grad_array = np.asarray(grad_vec, dtype=float)
-        expected_length = 3 * block_height
+        expected_length = total_blocks * block_height
 
         if grad_array.ndim != 1:
             raise ValueError("grad_vec must be a 1-dimensional array")
 
         if grad_array.shape != (expected_length,):
             raise ValueError(
-                "grad_vec must have shape "
-                f"({expected_length},), got {grad_array.shape}"
+                f"grad_vec must have length {expected_length}, "
+                f"got {grad_array.shape[0]}"
             )
 
         return grad_array
+
+    @classmethod
+    def _validate_grad_factors(
+        cls, grad_factors: Sequence[float], total_blocks: int
+    ) -> list[float]:
+        factors = [
+            cls._validate_positive_number(value, "grad_factors")
+            for value in grad_factors
+        ]
+
+        if len(factors) != total_blocks:
+            raise ValueError(
+                f"grad_factors must have length {total_blocks}, got {len(factors)}"
+            )
+
+        return factors
 
     @staticmethod
     def _validate_positive_number(value: float, name: str) -> float:
@@ -207,43 +170,21 @@ class Sandwich:
 
         return numeric_value
 
+    @staticmethod
+    def _pad_block_size(block_size: tuple[int, int], padding: int) -> tuple[int, int]:
+        return (block_size[0] + 2 * padding, block_size[1])
+
     def step(self) -> None:
         """
         Execute one complete iteration step of the Sandwich solver.
-
-        This method performs the complete solution cycle:
-        1. Set boundary conditions for all blocks
-        2. Apply Laplace operator to outer blocks (bottom and top)
-        3. Transfer data from outer blocks to middle block
-        4. Apply Laplace operator to middle block
-        5. Transfer data from middle block back to outer blocks
-        6. Swap current and next state arrays
-
-        Note:
-            This method modifies the internal state arrays in-place.
-            Call this method repeatedly in a loop to converge to the solution.
         """
         self._set_boundary_conditions()
-        self._make_laplace_step_outer()
-        self._transfer_values_inwards()
-        self._make_laplace_step_inner()
-        self._transfer_gradients_outwards()
+        self._run_laplace_inward_with_value_transfer()
+        self._transfer_gradients_outward()
 
     def plot(self, plot_abs: bool = False) -> go.Figure:
         """
         Generate a heatmap visualization of the current displacement field.
-
-        Args:
-            plot_abs (bool, optional): If True, plot absolute displacement values.
-                If False (default), plot raw displacement values.
-
-        Returns:
-            plotly.graph_objs._figure.Figure: A Plotly heatmap figure showing the
-            displacement field across all three blocks.
-
-        Note:
-            The displacement array is flipped vertically ([::-1]) to match conventional
-            plotting conventions where the origin is at the bottom-left.
         """
         displacement = self.get_displacement_array()[::-1]
 
@@ -254,114 +195,139 @@ class Sandwich:
 
     def get_displacement_array(self) -> np.ndarray:
         """
-        Get the complete displacement field across all three blocks.
-
-        Returns:
-            np.ndarray: A concatenated array containing the displacement values
-                       from all three blocks in the order: bottom, middle, top.
-                       The middle block excludes the boundary padding rows.
-
-        Note:
-            The returned array has shape (3*block_height, block_width) and represents
-            the current state of the entire computational domain.
+        Get the complete displacement field across all blocks.
         """
-        return np.concatenate(
-            (
-                self.bottom._state,
-                self.mid._state[1:-1],  # remove boundary conditions paddings
-                self.top._state,
-            )
+        displacement_parts = [self.bottom._state]
+        displacement_parts.extend(
+            mid_block._state[1:-1] for mid_block in self.mid_blocks
         )
+        displacement_parts.append(self.top._state)
+
+        return np.concatenate(displacement_parts)
 
     def get_residual(self) -> float:
         """
-        Calculate the residual (error) of the current solution.
-
-        The residual measures how well the current state satisfies the Laplace equation.
-        It is computed as the sum of absolute differences between the current state
-        and what the Laplace operator would predict for that state.
-
-        Returns:
-            float: The total residual across all three blocks. Lower values indicate
-                   better convergence to the solution.
-
-        Note:
-            The residual is computed only for interior points (excluding boundaries)
-            and summed across all blocks. This value can be used to monitor convergence
-            during iterative solution.
+        Calculate the residual of the current solution.
         """
         results: list[float] = []
-        for block in [self.bottom._state, self.mid._state, self.top._state]:
-            res_block = np.copy(block)
+        for block in self.blocks:
+            res_block = np.copy(block._state)
             set_laplace_update(res_block)
 
             results.append(
-                float(np.sum(np.abs(block[1:-1, 1:-1] - res_block[1:-1, 1:-1])))
+                float(np.sum(np.abs(block._state[1:-1, 1:-1] - res_block[1:-1, 1:-1])))
             )
 
         return sum(results)
 
     def _set_boundary_conditions(self) -> None:
-        """
-        Set boundary conditions for all three blocks.
-
-        This private method applies the appropriate boundary conditions to each block:
-        - Bottom block: Uses first block_height elements of grad_vec
-        - Middle block: Uses elements from block_height-1 to 2*block_height+1
-          of grad_vec
-        - Top block: Uses last block_height elements of grad_vec
-
-        Note:
-            This method modifies the next_state arrays in-place by calling the
-            appropriate boundary condition functions for each block.
-        """
         set_boundary_conditions_bottom_block(
-            self.bottom, self.grad_vec[: self.block_height], self.grid_step
-        )
-        set_boundary_conditions_middle_block(
-            self.mid,
-            self.grad_vec[self.block_height - 1 : 2 * self.block_height + 1],
+            self.bottom,
+            self._get_block_grad_vec(block_id=0, padding=0),
             self.grid_step,
         )
+
+        for block_id, mid_block in enumerate(self.mid_blocks, start=1):
+            set_boundary_conditions_middle_block(
+                mid_block,
+                self._get_block_grad_vec(block_id=block_id, padding=1),
+                self.grid_step,
+            )
+
         set_boundary_conditions_top_block(
             self.top,
-            self.grad_vec[2 * self.block_height : 3 * self.block_height],
+            self._get_block_grad_vec(block_id=len(self.blocks) - 1, padding=0),
             self.grid_step,
         )
 
-    def _make_laplace_step_outer(self) -> None:
-        """
-        Apply Laplace operator to the outer blocks (bottom and top).
+    def _get_block_grad_vec(self, block_id: int, padding: int) -> np.ndarray:
+        left_idx = block_id * self.block_height - padding
+        right_idx = (block_id + 1) * self.block_height + padding
 
-        This private method updates the next_state arrays of the bottom and top blocks
-        by applying the finite difference Laplace operator to their current states.
-        """
-        set_laplace_update(self.bottom._state)
-        set_laplace_update(self.top._state)
+        return self.grad_vec[left_idx:right_idx]
 
-    def _make_laplace_step_inner(self) -> None:
-        """
-        Apply Laplace operator to the middle block.
+    def _run_laplace_inward_with_value_transfer(self) -> None:
+        center_index = self._center_block_index
+        last_index = len(self.blocks) - 1
 
-        This private method updates the next_state array of the middle block
-        by applying the finite difference Laplace operator to its current state.
-        """
-        set_laplace_update(self.mid._state)
+        for distance_from_edge in range(center_index):
+            lower_index = distance_from_edge
+            upper_index = last_index - distance_from_edge
 
-    def _transfer_values_inwards(self) -> None:
-        # displacements are continuous
-        copy_boundary_values(
-            self.bottom, BoundaryType.TOP, self.mid, BoundaryType.BOTTOM
+            set_laplace_update(
+                self.blocks[lower_index]._state,
+            )
+            set_laplace_update(
+                self.blocks[upper_index]._state,
+            )
+
+            self._copy_boundary_values(
+                source_index=lower_index,
+                source_boundary=BoundaryType.TOP,
+                target_index=lower_index + 1,
+                target_boundary=BoundaryType.BOTTOM,
+            )
+            self._copy_boundary_values(
+                source_index=upper_index,
+                source_boundary=BoundaryType.BOTTOM,
+                target_index=upper_index - 1,
+                target_boundary=BoundaryType.TOP,
+            )
+
+        set_laplace_update(
+            self.blocks[center_index]._state,
         )
-        copy_boundary_values(self.top, BoundaryType.BOTTOM, self.mid, BoundaryType.TOP)
 
-    def _transfer_gradients_outwards(self) -> None:
-        # grads are proportional
-        grad_scale = 1 / self.grad_factor
+    def _transfer_gradients_outward(self) -> None:
+        center_index = self._center_block_index
+        last_index = len(self.blocks) - 1
 
-        copy_boundary_gradients(
-            self.mid, BoundaryType.BOTTOM, self.bottom, BoundaryType.TOP, grad_scale
+        for distance_from_edge in range(center_index - 1, -1, -1):
+            lower_source_index = distance_from_edge + 1
+            lower_target_index = distance_from_edge
+            upper_source_index = last_index - distance_from_edge - 1
+            upper_target_index = last_index - distance_from_edge
+
+            self._copy_boundary_gradients(
+                source_index=lower_source_index,
+                source_boundary=BoundaryType.BOTTOM,
+                target_index=lower_target_index,
+                target_boundary=BoundaryType.TOP,
+            )
+            self._copy_boundary_gradients(
+                source_index=upper_source_index,
+                source_boundary=BoundaryType.TOP,
+                target_index=upper_target_index,
+                target_boundary=BoundaryType.BOTTOM,
+            )
+
+    def _copy_boundary_values(
+        self,
+        source_index: int,
+        source_boundary: BoundaryType,
+        target_index: int,
+        target_boundary: BoundaryType,
+    ) -> None:
+        values = self.blocks[source_index].get_boundary_values(source_boundary)
+        self.blocks[target_index].set_boundary_values(target_boundary, values)
+
+    def _copy_boundary_gradients(
+        self,
+        source_index: int,
+        source_boundary: BoundaryType,
+        target_index: int,
+        target_boundary: BoundaryType,
+    ) -> None:
+        gradients = self.blocks[source_index].get_boundary_gradients(source_boundary)
+        scale = self._get_grad_scale(source_index, target_index)
+        self.blocks[target_index].set_boundary_gradients(
+            target_boundary,
+            gradients * scale,
         )
-        copy_boundary_gradients(
-            self.mid, BoundaryType.TOP, self.top, BoundaryType.BOTTOM, grad_scale
-        )
+
+    @property
+    def _center_block_index(self) -> int:
+        return len(self.blocks) // 2
+
+    def _get_grad_scale(self, source_block_id: int, target_block_id: int) -> float:
+        return self.grad_factors[target_block_id] / self.grad_factors[source_block_id]

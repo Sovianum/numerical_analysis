@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Run the Sandwich integration scenarios and save reproducible artifacts.
 
-The configured cases use two sandwiches with the same sinusoidal boundary
-gradient and different middle-layer gradient factors (``mu``).
+The configured cases use sandwiches with the same sinusoidal boundary gradient
+and different full-block gradient factor sets.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def run_case(
         "  block_size="
         f"({run.block_height}, {run.block_width}), "
         f"grid_step={run.grid_step}, "
-        f"mu={run.mu:g}, "
+        f"grad_factors={run.grad_factors}, "
         f"iterations={run.iterations}"
     )
 
