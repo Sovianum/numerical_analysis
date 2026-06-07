@@ -40,6 +40,13 @@ class SandwichSolution:
 
 ProgressCallback = Callable[[int, float | None], None]
 
+GRADIENT_PROFILE_SINE = "sine"
+GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN = "parabolic_zero_mean"
+GRADIENT_PROFILES = (
+    GRADIENT_PROFILE_SINE,
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+)
+
 
 SANDWICH_RUNS: tuple[SandwichRun, ...] = (
     SandwichRun(
@@ -138,9 +145,16 @@ def create_sandwich(run: SandwichRun) -> Sandwich:
 
 def build_gradient_vector(run: SandwichRun) -> np.ndarray:
     mesh_height = run.block_height * len(run.grad_factors)
-    if run.gradient_profile != "sine":
+
+    if run.gradient_profile == GRADIENT_PROFILE_SINE:
+        gradient = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+    elif run.gradient_profile == GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN:
+        full_thickness = (mesh_height - 1) * run.grid_step
+        x = np.linspace(-full_thickness / 2, full_thickness / 2, mesh_height)
+        gradient = x**2 - full_thickness**2 / 12
+    else:
         raise ValueError(f"Unsupported gradient profile: {run.gradient_profile}")
-    gradient = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+
     return np.asarray(gradient, dtype=float)
 
 

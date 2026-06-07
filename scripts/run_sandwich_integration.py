@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Run the Sandwich integration scenarios and save reproducible artifacts.
-
-The configured cases use sandwiches with the same sinusoidal boundary gradient
-and different full-block gradient factor sets.
-"""
+"""Run the Sandwich integration scenarios and save reproducible artifacts."""
 
 from __future__ import annotations
 
@@ -31,6 +27,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from sandwich_numerical.integration import (
+    GRADIENT_PROFILES,
     SANDWICH_RUNS,
     SandwichRun,
     SandwichSolution,
@@ -41,6 +38,7 @@ from sandwich_numerical.integration import (
 
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
+DISPLACEMENT_CMAP = "bwr"
 
 
 def main() -> None:
@@ -89,6 +87,11 @@ def parse_args() -> argparse.Namespace:
         "--gradient-relaxation",
         type=float,
         help="Under-relaxation for copied interface gradients.",
+    )
+    parser.add_argument(
+        "--gradient-profile",
+        choices=GRADIENT_PROFILES,
+        help="Override the boundary gradient profile for selected sandwiches.",
     )
     overlap_group = parser.add_mutually_exclusive_group()
     overlap_group.add_argument(
@@ -142,6 +145,10 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             )
         if args.gradient_relaxation is not None:
             replacements["gradient_relaxation"] = args.gradient_relaxation
+        if args.gradient_profile is not None:
+            replacements["gradient_profile"] = args.gradient_profile
+            if args.gradient_profile != run.gradient_profile:
+                replacements["name"] = f"{run.name}_{args.gradient_profile}"
         if args.enforce_overlap_continuity is not None:
             replacements["enforce_overlap_continuity"] = args.enforce_overlap_continuity
         prepared.append(dataclasses.replace(run, **replacements))
@@ -168,6 +175,7 @@ def run_case(
         f"({run.block_height}, {run.block_width}), "
         f"grid_step={run.grid_step}, "
         f"grad_factors={run.grad_factors}, "
+        f"gradient_profile={run.gradient_profile}, "
         f"gradient_relaxation={run.gradient_relaxation}, "
         f"enforce_overlap_continuity={run.enforce_overlap_continuity}, "
         f"iterations={run.iterations}"
@@ -255,7 +263,7 @@ def make_heatmap_figure(
     image = ax.imshow(
         data,
         aspect="auto",
-        cmap="RdBu_r",
+        cmap=DISPLACEMENT_CMAP,
         norm=make_displacement_norm(data),
         origin="lower",
     )
@@ -326,10 +334,10 @@ def make_displacement_norm(data: np.ndarray):
         return None
     min_value = float(finite.min())
     max_value = float(finite.max())
-    if min_value < 0 < max_value:
-        limit = max(abs(min_value), abs(max_value))
-        return TwoSlopeNorm(vmin=-limit, vcenter=0, vmax=limit)
-    return None
+    limit = max(abs(min_value), abs(max_value))
+    if limit == 0:
+        limit = 1.0
+    return TwoSlopeNorm(vmin=-limit, vcenter=0, vmax=limit)
 
 
 def write_figure_png(
