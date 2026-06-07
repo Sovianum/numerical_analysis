@@ -178,7 +178,7 @@ class Sandwich:
         """
         Execute one complete iteration step of the Sandwich solver.
         """
-        self._set_boundary_conditions_generalized()
+        self._set_boundary_conditions()
         self._run_laplace_inward_with_value_transfer()
         self._transfer_gradients_outward()
 
@@ -220,7 +220,7 @@ class Sandwich:
 
         return sum(results)
 
-    def _set_boundary_conditions_generalized(self) -> None:
+    def _set_boundary_conditions(self) -> None:
         set_boundary_conditions_bottom_block(
             self.bottom,
             self._get_block_grad_vec(block_id=0, padding=0),
