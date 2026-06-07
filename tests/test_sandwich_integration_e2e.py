@@ -52,6 +52,7 @@ def assert_parameters_match_csv(run: SandwichRun, path: Path) -> None:
     expected = pd.read_csv(path)
     actual = parameters_data_to_df(run)
     actual["sample_x1_positions"] = actual["sample_x1_positions"].astype(str)
+    actual["grad_factors"] = actual["grad_factors"].astype(str)
 
     assert list(actual.columns) == list(expected.columns)
     pd.testing.assert_frame_equal(actual, expected, check_dtype=False)
