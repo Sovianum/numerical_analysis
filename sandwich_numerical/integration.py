@@ -121,7 +121,8 @@ def build_gradient_vector(run: SandwichRun) -> np.ndarray:
     mesh_height = run.block_height * 3
     if run.gradient_profile != "sine":
         raise ValueError(f"Unsupported gradient profile: {run.gradient_profile}")
-    return np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+    gradient = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+    return np.asarray(gradient, dtype=float)
 
 
 def samples_data_to_df(run: SandwichRun, displacement: np.ndarray) -> pd.DataFrame:
