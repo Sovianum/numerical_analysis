@@ -282,7 +282,7 @@ class TestSandwich:
         )
 
     def test_overlap_continuity_averages_duplicate_coordinates(self):
-        """Overlap projection must average rows that represent the same x2 coordinate."""
+        """Overlap projection must average duplicate x2 coordinate rows."""
         mesh = Sandwich(
             num_mid_blocks=3,
             block_size=(4, 5),
