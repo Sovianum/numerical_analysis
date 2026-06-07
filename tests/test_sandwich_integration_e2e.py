@@ -1,5 +1,6 @@
 """End-to-end regression checks for the scripted Sandwich integration runs."""
 
+import argparse
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ import pandas as pd
 import pytest
 
 from sandwich_numerical.integration import (
+    GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
     SANDWICH_RUNS,
     SandwichRun,
@@ -21,6 +23,7 @@ from scripts.run_sandwich_integration import (
     layer_boundary_x2,
     make_displacement_norm,
     make_heatmap_figure,
+    prepare_runs,
 )
 
 
@@ -91,6 +94,33 @@ def test_parabolic_zero_mean_gradient_profile_matches_formula() -> None:
         full_thickness**3 / 12 - full_thickness * full_thickness**2 / 12
     )
     assert analytic_integral == pytest.approx(0.0, abs=1e-15)
+
+
+@pytest.mark.parametrize(
+    ("gradient_profile", "expected_name"),
+    [
+        (GRADIENT_PROFILE_SINE, "grad_factors_1_1_1_load_sin"),
+        (
+            GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+            "grad_factors_1_1_1_load_parabolic",
+        ),
+    ],
+)
+def test_prepare_runs_adds_load_shape_to_name_for_explicit_profile(
+    gradient_profile: str, expected_name: str
+) -> None:
+    args = argparse.Namespace(
+        case=["grad_factors_1_1_1"],
+        iterations=None,
+        block_width=None,
+        gradient_relaxation=None,
+        gradient_profile=gradient_profile,
+        enforce_overlap_continuity=None,
+    )
+
+    (run,) = prepare_runs(args)
+
+    assert run.name == expected_name
 
 
 @pytest.mark.parametrize(

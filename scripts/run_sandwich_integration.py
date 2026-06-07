@@ -27,6 +27,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from sandwich_numerical.integration import (
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+    GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILES,
     SANDWICH_RUNS,
     SandwichRun,
@@ -39,6 +41,10 @@ from sandwich_numerical.integration import (
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
 DISPLACEMENT_CMAP = "bwr"
+LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
+    GRADIENT_PROFILE_SINE: "load_sin",
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
+}
 
 
 def main() -> None:
@@ -147,8 +153,9 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             replacements["gradient_relaxation"] = args.gradient_relaxation
         if args.gradient_profile is not None:
             replacements["gradient_profile"] = args.gradient_profile
-            if args.gradient_profile != run.gradient_profile:
-                replacements["name"] = f"{run.name}_{args.gradient_profile}"
+            replacements[
+                "name"
+            ] = f"{run.name}_{LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE[args.gradient_profile]}"
         if args.enforce_overlap_continuity is not None:
             replacements["enforce_overlap_continuity"] = args.enforce_overlap_continuity
         prepared.append(dataclasses.replace(run, **replacements))
