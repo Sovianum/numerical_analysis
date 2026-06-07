@@ -91,6 +91,11 @@ def parse_args() -> argparse.Namespace:
         help="Under-relaxation for copied interface gradients.",
     )
     parser.add_argument(
+        "--enforce-overlap-continuity",
+        action="store_true",
+        help="Average duplicate real/ghost rows shared by adjacent blocks.",
+    )
+    parser.add_argument(
         "--csv-only",
         action="store_true",
         help="Write CSV data without PNG figures.",
@@ -128,6 +133,8 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             )
         if args.gradient_relaxation is not None:
             replacements["gradient_relaxation"] = args.gradient_relaxation
+        if args.enforce_overlap_continuity:
+            replacements["enforce_overlap_continuity"] = True
         prepared.append(dataclasses.replace(run, **replacements))
 
     if not prepared:
@@ -153,6 +160,7 @@ def run_case(
         f"grid_step={run.grid_step}, "
         f"grad_factors={run.grad_factors}, "
         f"gradient_relaxation={run.gradient_relaxation}, "
+        f"enforce_overlap_continuity={run.enforce_overlap_continuity}, "
         f"iterations={run.iterations}"
     )
 

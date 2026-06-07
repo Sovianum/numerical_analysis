@@ -154,6 +154,7 @@ class TestSandwich:
         assert sample_mesh.grid_step == 0.1
         assert sample_mesh.grad_factors == [1.0, 1.0, 1.0]
         assert sample_mesh.gradient_relaxation == 1.0
+        assert sample_mesh.enforce_overlap_continuity is False
         assert sample_mesh.num_mid_blocks == 1
         assert sample_mesh.grad_vec.shape == (30,)
 
@@ -280,6 +281,28 @@ class TestSandwich:
             atol=1e-15,
         )
 
+    def test_overlap_continuity_averages_duplicate_coordinates(self):
+        """Overlap projection must average rows that represent the same x2 coordinate."""
+        mesh = Sandwich(
+            num_mid_blocks=3,
+            block_size=(4, 5),
+            grad_vec=np.zeros(20),
+            grid_step=0.1,
+            grad_factors=[1.0, 1.0, 1.0, 1.0, 1.0],
+            enforce_overlap_continuity=True,
+        )
+        mesh.blocks[1]._state[-2, :] = 2.0
+        mesh.blocks[2]._state[0, :] = 4.0
+        mesh.blocks[1]._state[-1, :] = 6.0
+        mesh.blocks[2]._state[1, :] = 10.0
+
+        mesh._enforce_overlap_continuity()
+
+        np.testing.assert_allclose(mesh.blocks[1]._state[-2, :], 3.0)
+        np.testing.assert_allclose(mesh.blocks[2]._state[0, :], 3.0)
+        np.testing.assert_allclose(mesh.blocks[1]._state[-1, :], 8.0)
+        np.testing.assert_allclose(mesh.blocks[2]._state[1, :], 8.0)
+
     def test_displacement_array(self, sample_mesh):
         """Test that displacement array has correct shape."""
         displacement = sample_mesh.get_displacement_array()
@@ -403,6 +426,21 @@ class TestSandwich:
                 grid_step=0.1,
                 grad_factors=[1.0, 1.0, 1.0],
                 gradient_relaxation=gradient_relaxation,
+            )
+
+    def test_invalid_enforce_overlap_continuity(self):
+        """Test that overlap continuity flag must be boolean."""
+        block_size = (10, 10)
+        grad_vec = np.linspace(0, 1, 3 * block_size[0])
+
+        with pytest.raises(TypeError, match="enforce_overlap_continuity"):
+            Sandwich(
+                num_mid_blocks=1,
+                block_size=block_size,
+                grad_vec=grad_vec,
+                grid_step=0.1,
+                grad_factors=[1.0, 1.0, 1.0],
+                enforce_overlap_continuity=1,
             )
 
     @pytest.mark.parametrize("block_size", [(1, 10), (10, 1)])

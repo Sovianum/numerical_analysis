@@ -72,6 +72,7 @@ class Sandwich:
         grid_step: float,
         grad_factors: Sequence[float],
         gradient_relaxation: float = 1.0,
+        enforce_overlap_continuity: bool = False,
     ) -> None:
         self.block_size = self._validate_block_size(block_size)
         self.block_height = self.block_size[0]
@@ -82,6 +83,10 @@ class Sandwich:
         self.gradient_relaxation = self._validate_relaxation(
             gradient_relaxation,
             "gradient_relaxation",
+        )
+        self.enforce_overlap_continuity = self._validate_bool(
+            enforce_overlap_continuity,
+            "enforce_overlap_continuity",
         )
 
         self.grad_vec = self._validate_grad_vec(
@@ -185,6 +190,13 @@ class Sandwich:
         return numeric_value
 
     @staticmethod
+    def _validate_bool(value: bool, name: str) -> bool:
+        if not isinstance(value, bool):
+            raise TypeError(f"{name} must be a boolean")
+
+        return value
+
+    @staticmethod
     def _pad_block_size(block_size: tuple[int, int], padding: int) -> tuple[int, int]:
         return (block_size[0] + 2 * padding, block_size[1])
 
@@ -195,6 +207,8 @@ class Sandwich:
         self._set_boundary_conditions()
         self._run_laplace_inward_with_value_transfer()
         self._transfer_gradients_outward()
+        if self.enforce_overlap_continuity:
+            self._enforce_overlap_continuity()
 
     def plot(self, plot_abs: bool = False) -> go.Figure:
         """
@@ -351,3 +365,29 @@ class Sandwich:
 
     def _get_grad_scale(self, source_block_id: int, target_block_id: int) -> float:
         return self.grad_factors[target_block_id] / self.grad_factors[source_block_id]
+
+    def _enforce_overlap_continuity(self) -> None:
+        last_index = len(self.blocks) - 1
+        for lower_index in range(last_index):
+            upper_index = lower_index + 1
+            lower = self.blocks[lower_index]
+            upper = self.blocks[upper_index]
+
+            lower_top_real = -1 if lower_index == 0 else -2
+            upper_bottom_real = 0 if upper_index == last_index else 1
+
+            if upper_index != last_index:
+                self._average_overlap_rows(lower, lower_top_real, upper, 0)
+            if lower_index != 0:
+                self._average_overlap_rows(lower, -1, upper, upper_bottom_real)
+
+    @staticmethod
+    def _average_overlap_rows(
+        lower: MeshBlock,
+        lower_row: int,
+        upper: MeshBlock,
+        upper_row: int,
+    ) -> None:
+        average = (lower._state[lower_row, :] + upper._state[upper_row, :]) / 2
+        lower._state[lower_row, :] = average
+        upper._state[upper_row, :] = average
