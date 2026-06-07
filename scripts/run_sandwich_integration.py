@@ -236,7 +236,7 @@ def layer_boundary_rows(run: SandwichRun) -> np.ndarray:
 
 
 def layer_boundary_x2(run: SandwichRun) -> np.ndarray:
-    return np.arange(1, len(run.grad_factors)) * run.block_height * run.grid_step
+    return layer_boundary_rows(run) * run.grid_step
 
 
 def make_heatmap_figure(
