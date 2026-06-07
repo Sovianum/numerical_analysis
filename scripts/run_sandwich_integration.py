@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Run the Sandwich notebook scenario and save reproducible artifacts.
+"""Run the Sandwich integration scenarios and save reproducible artifacts.
 
-The configured cases mirror ``notebooks/Sandwich.ipynb``: two sandwiches with
-the same sinusoidal boundary gradient and different middle-layer gradient
-factors (``mu``).
+The configured cases use two sandwiches with the same sinusoidal boundary
+gradient and different middle-layer gradient factors (``mu``).
 """
 
 from __future__ import annotations
@@ -61,7 +60,7 @@ def main() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser_description = (
-        "Run configured Sandwich notebook scenarios and save CSV/PNG artifacts."
+        "Run configured Sandwich integration scenarios and save CSV/PNG artifacts."
     )
     parser = argparse.ArgumentParser(description=parser_description)
     parser.add_argument(
