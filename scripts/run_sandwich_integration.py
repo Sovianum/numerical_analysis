@@ -27,6 +27,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from sandwich_numerical.integration import (
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
+    GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILES,
     SANDWICH_RUNS,
     SandwichRun,
@@ -39,6 +41,31 @@ from sandwich_numerical.integration import (
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
 DISPLACEMENT_CMAP = "bwr"
+LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
+    GRADIENT_PROFILE_SINE: "load_sin",
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
+}
+
+
+def case_name_for_gradient_profile(case_name: str, gradient_profile: str) -> str:
+    return f"{case_name}_{LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE[gradient_profile]}"
+
+
+def load_specific_case_aliases() -> dict[str, tuple[str, str]]:
+    return {
+        case_name_for_gradient_profile(run.name, gradient_profile): (
+            run.name,
+            gradient_profile,
+        )
+        for run in SANDWICH_RUNS
+        for gradient_profile in GRADIENT_PROFILES
+    }
+
+
+def case_choices() -> tuple[str, ...]:
+    base_cases = tuple(run.name for run in SANDWICH_RUNS)
+    load_specific_cases = tuple(sorted(load_specific_case_aliases()))
+    return base_cases + load_specific_cases
 
 
 def main() -> None:
@@ -69,9 +96,12 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--case",
-        choices=[run.name for run in SANDWICH_RUNS],
+        choices=case_choices(),
         action="append",
-        help="Run only the selected case. Can be passed more than once.",
+        help=(
+            "Run only the selected case or load-specific scenario. "
+            "Can be passed more than once."
+        ),
     )
     parser.add_argument(
         "--iterations",
@@ -124,13 +154,11 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
         if not (0 < args.gradient_relaxation <= 1):
             raise SystemExit("--gradient-relaxation must be in the interval (0, 1].")
 
-    runs: Iterable[SandwichRun] = SANDWICH_RUNS
-    if args.case:
-        selected_names = set(args.case)
-        runs = [run for run in runs if run.name in selected_names]
-
+    runs_by_name = {run.name: run for run in SANDWICH_RUNS}
+    selected_cases = resolve_case_selection(args.case, args.gradient_profile)
     prepared = []
-    for run in runs:
+    for run_name, gradient_profile in selected_cases:
+        run = runs_by_name[run_name]
         replacements = {}
         if args.iterations is not None:
             replacements["iterations"] = args.iterations
@@ -145,10 +173,11 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             )
         if args.gradient_relaxation is not None:
             replacements["gradient_relaxation"] = args.gradient_relaxation
-        if args.gradient_profile is not None:
-            replacements["gradient_profile"] = args.gradient_profile
-            if args.gradient_profile != run.gradient_profile:
-                replacements["name"] = f"{run.name}_{args.gradient_profile}"
+        if gradient_profile is not None:
+            replacements["gradient_profile"] = gradient_profile
+            replacements["name"] = case_name_for_gradient_profile(
+                run.name, gradient_profile
+            )
         if args.enforce_overlap_continuity is not None:
             replacements["enforce_overlap_continuity"] = args.enforce_overlap_continuity
         prepared.append(dataclasses.replace(run, **replacements))
@@ -156,6 +185,31 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
     if not prepared:
         raise SystemExit("No sandwich cases selected.")
     return tuple(prepared)
+
+
+def resolve_case_selection(
+    case_names: Iterable[str] | None, gradient_profile: str | None
+) -> tuple[tuple[str, str | None], ...]:
+    if not case_names:
+        return tuple((run.name, gradient_profile) for run in SANDWICH_RUNS)
+
+    aliases = load_specific_case_aliases()
+    selected_cases = []
+    for case_name in case_names:
+        if case_name not in aliases:
+            selected_cases.append((case_name, gradient_profile))
+            continue
+
+        base_case_name, case_gradient_profile = aliases[case_name]
+        if gradient_profile is not None and gradient_profile != case_gradient_profile:
+            raise SystemExit(
+                f"--case {case_name!r} implies gradient profile "
+                f"{case_gradient_profile!r}, but --gradient-profile "
+                f"{gradient_profile!r} was requested."
+            )
+        selected_cases.append((base_case_name, case_gradient_profile))
+
+    return tuple(selected_cases)
 
 
 def run_case(
