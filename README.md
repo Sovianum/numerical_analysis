@@ -54,7 +54,7 @@ import numpy as np
 
 # Create a gradient vector
 block_size = (10, 10)  # (height, width)
-grad_vec = np.linspace(0, 1, 3 * block_size[0] + 1)
+grad_vec = np.linspace(0, 1, 3 * block_size[0])
 
 # Create and use the Sandwich solver
 mesh = Sandwich(

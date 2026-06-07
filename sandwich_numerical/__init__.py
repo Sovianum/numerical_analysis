@@ -1,1 +1,1 @@
-
+"""Sandwich numerical analysis package."""
