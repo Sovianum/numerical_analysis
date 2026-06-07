@@ -205,6 +205,7 @@ def write_solution_figures(
         make_heatmap_figure(
             displacement[:, :heatmap_columns],
             f"Displacement {run.name}: first {heatmap_columns} columns",
+            layer_boundary_rows(run),
         ),
         case_dir / "displacement_heatmap.png",
     )
@@ -212,11 +213,16 @@ def write_solution_figures(
         make_heatmap_figure(
             displacement[:, :detail_columns],
             f"Displacement {run.name}: first {detail_columns} columns",
+            layer_boundary_rows(run),
         ),
         case_dir / "displacement_detail_heatmap.png",
     )
     write_figure_png(
-        make_samples_figure(solution.samples, f"Samples {run.name}"),
+        make_samples_figure(
+            solution.samples,
+            f"Samples {run.name}",
+            layer_boundary_x2(run),
+        ),
         case_dir / "samples.png",
     )
     write_figure_png(
@@ -225,7 +231,17 @@ def write_solution_figures(
     )
 
 
-def make_heatmap_figure(data: np.ndarray, title: str):
+def layer_boundary_rows(run: SandwichRun) -> np.ndarray:
+    return np.arange(1, len(run.grad_factors)) * run.block_height - 0.5
+
+
+def layer_boundary_x2(run: SandwichRun) -> np.ndarray:
+    return np.arange(1, len(run.grad_factors)) * run.block_height * run.grid_step
+
+
+def make_heatmap_figure(
+    data: np.ndarray, title: str, layer_boundaries: np.ndarray | None = None
+):
     fig, ax = plt.subplots(figsize=(11.2, 6.5))
     image = ax.imshow(
         data,
@@ -237,22 +253,52 @@ def make_heatmap_figure(data: np.ndarray, title: str):
     ax.set_title(title)
     ax.set_xlabel("x1 column")
     ax.set_ylabel("x2 row")
+    add_horizontal_layer_boundaries(ax, layer_boundaries, data.shape[0])
     fig.colorbar(image, ax=ax, label="displacement")
     return fig
 
 
-def make_samples_figure(samples: pd.DataFrame, title: str):
+def make_samples_figure(
+    samples: pd.DataFrame, title: str, layer_boundaries: np.ndarray | None = None
+):
     fig, ax = plt.subplots(figsize=(11.2, 6.5))
     for column in samples.columns:
         if column == "x2":
             continue
         ax.plot(samples["x2"], samples[column], label=column)
+    add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_title(title)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
     ax.grid(True, alpha=0.3)
     ax.legend()
     return fig
+
+
+def add_horizontal_layer_boundaries(
+    ax, layer_boundaries: np.ndarray | None, row_count: int
+) -> None:
+    if layer_boundaries is None:
+        return
+    for boundary in layer_boundaries:
+        if 0 < boundary < row_count - 1:
+            ax.axhline(
+                boundary, color="black", linestyle="--", linewidth=0.8, alpha=0.5
+            )
+
+
+def add_vertical_layer_boundaries(ax, layer_boundaries: np.ndarray | None) -> None:
+    if layer_boundaries is None:
+        return
+    for index, boundary in enumerate(layer_boundaries):
+        ax.axvline(
+            boundary,
+            color="black",
+            linestyle="--",
+            linewidth=0.8,
+            alpha=0.5,
+            label="layer boundary" if index == 0 else "_nolegend_",
+        )
 
 
 def make_residuals_figure(residuals: pd.DataFrame, title: str):
