@@ -93,7 +93,6 @@ class Sandwich:
         self.bottom = self.blocks[0]
         self.top = self.blocks[-1]
         self.mid_blocks = self.blocks[1:-1]
-        self.mid = self.mid_blocks[0]
 
     @staticmethod
     def _validate_block_size(block_size: tuple[int, int]) -> tuple[int, int]:

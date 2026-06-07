@@ -168,7 +168,6 @@ class TestSandwich:
         """Test that state arrays are properly initialized."""
         assert sample_mesh.bottom.state.shape == (10, 10)
         assert sample_mesh.mid_blocks[0].state.shape == (12, 10)
-        assert sample_mesh.mid.state.shape == (12, 10)
         assert sample_mesh.top.state.shape == (10, 10)
 
     def test_multi_mid_state_arrays(self, multi_mid_mesh):
