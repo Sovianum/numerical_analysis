@@ -153,6 +153,7 @@ class TestSandwich:
         assert sample_mesh.block_size == (10, 10)
         assert sample_mesh.grid_step == 0.1
         assert sample_mesh.grad_factors == [1.0, 1.0, 1.0]
+        assert sample_mesh.gradient_relaxation == 1.0
         assert sample_mesh.num_mid_blocks == 1
         assert sample_mesh.grad_vec.shape == (30,)
 
@@ -235,6 +236,48 @@ class TestSandwich:
         assert generalized.get_residual() == pytest.approx(
             reference.get_residual(),
             abs=1e-15,
+        )
+
+    def test_gradient_relaxation_blends_copied_gradients(self):
+        """Relaxed transfer should blend new interface gradients with current ones."""
+        block_size = (7, 11)
+        grid_step = 0.05
+        mesh_height = 3 * block_size[0]
+        grad_vec = np.sin((2 * np.pi) / (mesh_height - 1) * np.arange(mesh_height))
+        relaxation = 0.25
+        mesh = Sandwich(
+            num_mid_blocks=1,
+            block_size=block_size,
+            grad_vec=grad_vec,
+            grid_step=grid_step,
+            grad_factors=[1000.0, 1.0, 1000.0],
+            gradient_relaxation=relaxation,
+        )
+
+        mesh._set_boundary_conditions()
+        mesh._run_laplace_inward_with_value_transfer()
+
+        target = mesh.blocks[0]
+        current_gradients = target.get_boundary_gradients(BoundaryType.TOP)
+        desired_gradients = mesh.blocks[1].get_boundary_gradients(
+            BoundaryType.BOTTOM
+        ) * mesh._get_grad_scale(1, 0)
+        expected_gradients = current_gradients + relaxation * (
+            desired_gradients - current_gradients
+        )
+
+        mesh._copy_boundary_gradients(
+            source_index=1,
+            source_boundary=BoundaryType.BOTTOM,
+            target_index=0,
+            target_boundary=BoundaryType.TOP,
+        )
+
+        np.testing.assert_allclose(
+            target.get_boundary_gradients(BoundaryType.TOP),
+            expected_gradients,
+            rtol=0,
+            atol=1e-15,
         )
 
     def test_displacement_array(self, sample_mesh):
@@ -344,6 +387,22 @@ class TestSandwich:
                 grad_vec=grad_vec,
                 grid_step=grid_step,
                 grad_factors=[1.0, 1.0, 1.0],
+            )
+
+    @pytest.mark.parametrize("gradient_relaxation", [0.0, -0.1, 1.1, np.inf])
+    def test_invalid_gradient_relaxation(self, gradient_relaxation):
+        """Test that invalid gradient relaxation values are rejected."""
+        block_size = (10, 10)
+        grad_vec = np.linspace(0, 1, 3 * block_size[0])
+
+        with pytest.raises(ValueError, match="gradient_relaxation"):
+            Sandwich(
+                num_mid_blocks=1,
+                block_size=block_size,
+                grad_vec=grad_vec,
+                grid_step=0.1,
+                grad_factors=[1.0, 1.0, 1.0],
+                gradient_relaxation=gradient_relaxation,
             )
 
     @pytest.mark.parametrize("block_size", [(1, 10), (10, 1)])

@@ -27,6 +27,7 @@ class SandwichRun:
     detail_heatmap_columns: int
     sample_x1_positions: tuple[float, ...]
     gradient_profile: str = "sine"
+    gradient_relaxation: float = 1.0
 
 
 @dataclass(frozen=True)
@@ -115,6 +116,7 @@ def create_sandwich(run: SandwichRun) -> Sandwich:
         grad_vec=build_gradient_vector(run),
         grid_step=run.grid_step,
         grad_factors=run.grad_factors,
+        gradient_relaxation=run.gradient_relaxation,
     )
 
 

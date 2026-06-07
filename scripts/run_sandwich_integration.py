@@ -86,6 +86,11 @@ def parse_args() -> argparse.Namespace:
         help="Override block width for all selected sandwiches; useful for smoke runs.",
     )
     parser.add_argument(
+        "--gradient-relaxation",
+        type=float,
+        help="Under-relaxation for copied interface gradients.",
+    )
+    parser.add_argument(
         "--csv-only",
         action="store_true",
         help="Write CSV data without PNG figures.",
@@ -98,6 +103,9 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
         raise SystemExit("--iterations must be non-negative.")
     if args.block_width is not None and args.block_width < 2:
         raise SystemExit("--block-width must be at least 2.")
+    if args.gradient_relaxation is not None:
+        if not (0 < args.gradient_relaxation <= 1):
+            raise SystemExit("--gradient-relaxation must be in the interval (0, 1].")
 
     runs: Iterable[SandwichRun] = SANDWICH_RUNS
     if args.case:
@@ -118,6 +126,8 @@ def prepare_runs(args: argparse.Namespace) -> tuple[SandwichRun, ...]:
             replacements["detail_heatmap_columns"] = min(
                 run.detail_heatmap_columns, args.block_width
             )
+        if args.gradient_relaxation is not None:
+            replacements["gradient_relaxation"] = args.gradient_relaxation
         prepared.append(dataclasses.replace(run, **replacements))
 
     if not prepared:
@@ -142,6 +152,7 @@ def run_case(
         f"({run.block_height}, {run.block_width}), "
         f"grid_step={run.grid_step}, "
         f"grad_factors={run.grad_factors}, "
+        f"gradient_relaxation={run.gradient_relaxation}, "
         f"iterations={run.iterations}"
     )
 
