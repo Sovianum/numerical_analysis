@@ -1,28 +1,29 @@
 import numpy as np
 
 
-def set_laplace_update(state: np.ndarray):
+def set_laplace_update(state: np.ndarray) -> None:
     """
     Apply the Laplace operator to update the next state from the current state.
-    
+
     This function implements a finite difference approximation of the Laplace operator
     using a 5-point stencil. It computes the average of the four neighboring values
     (left, right, bottom, top) for each interior point.
-    
+
     Args:
         state (np.ndarray): Current state array of shape (n, m)
-        
+
     Note:
         The function updates only the interior points (1:-1, 1:-1) of state.
-        Boundary points are assumed to be handled separately by boundary condition functions.
+        Boundary points are assumed to be handled separately by boundary
+        condition functions.
     """
-    
+
     assert len(state.shape) == 2
-    
+
     values_left = state[1:-1, :-2]
     values_right = state[1:-1, 2:]
-    
+
     values_bottom = state[:-2, 1:-1]
     values_top = state[2:, 1:-1]
-    
-    state[1:-1, 1:-1] = (values_left + values_right + values_bottom + values_top) / 4 
+
+    state[1:-1, 1:-1] = (values_left + values_right + values_bottom + values_top) / 4

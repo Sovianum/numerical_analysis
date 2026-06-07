@@ -39,9 +39,6 @@ myst-parser = "^1.0.0"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry.scripts]
-sandwich-demo = "sandwich_numerical.main:main"
-
 [tool.black]
 line-length = 88
 target-version = ['py311']
@@ -52,9 +49,13 @@ warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
 
+[[tool.mypy.overrides]]
+module = ["plotly.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--cov=sandwich_numerical --cov-report=html --cov-report=term-missing" 
+addopts = "--cov=sandwich_numerical --cov-report=html --cov-report=term-missing"
