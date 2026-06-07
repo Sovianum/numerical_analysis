@@ -1,0 +1,100 @@
+name: Sandwich Integration Artifacts
+
+on:
+  pull_request:
+    branches: [ master ]
+    types: [ closed ]
+
+jobs:
+  generate:
+    if: github.event.pull_request.merged == true
+    name: ${{ matrix.case_label }} / ${{ matrix.profile_label }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - case: grad_factors_1_1_1
+            case_label: "(1, 1, 1)"
+            gradient_profile: sine
+            profile_label: sin
+            artifact_dir: grad_factors_1_1_1_sin
+            artifact_name: sandwich-integration-1-1-1-sin
+          - case: grad_factors_1_1_1
+            case_label: "(1, 1, 1)"
+            gradient_profile: parabolic_zero_mean
+            profile_label: parabolic
+            artifact_dir: grad_factors_1_1_1_parabolic
+            artifact_name: sandwich-integration-1-1-1-parabolic
+          - case: grad_factors_1_1000_1
+            case_label: "(1, 1000, 1)"
+            gradient_profile: sine
+            profile_label: sin
+            artifact_dir: grad_factors_1_1000_1_sin
+            artifact_name: sandwich-integration-1-1000-1-sin
+          - case: grad_factors_1_1000_1
+            case_label: "(1, 1000, 1)"
+            gradient_profile: parabolic_zero_mean
+            profile_label: parabolic
+            artifact_dir: grad_factors_1_1000_1_parabolic
+            artifact_name: sandwich-integration-1-1000-1-parabolic
+          - case: grad_factors_1000_1_1000_1_1000
+            case_label: "(1000, 1, 1000, 1, 1000)"
+            gradient_profile: sine
+            profile_label: sin
+            artifact_dir: grad_factors_1000_1_1000_1_1000_sin
+            artifact_name: sandwich-integration-1000-1-1000-1-1000-sin
+          - case: grad_factors_1000_1_1000_1_1000
+            case_label: "(1000, 1, 1000, 1, 1000)"
+            gradient_profile: parabolic_zero_mean
+            profile_label: parabolic
+            artifact_dir: grad_factors_1000_1_1000_1_1000_parabolic
+            artifact_name: sandwich-integration-1000-1-1000-1-1000-parabolic
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: sandwich-integration-venv-${{ runner.os }}-3.11-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction --only-root
+
+      - name: Generate Sandwich integration artifacts
+        run: |
+          poetry run python scripts/run_sandwich_integration.py \
+            --case "${{ matrix.case }}" \
+            --gradient-profile "${{ matrix.gradient_profile }}" \
+            --output-dir "artifacts/sandwich_integration/${{ matrix.artifact_dir }}"
+
+      - name: Upload Sandwich integration artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts/sandwich_integration/${{ matrix.artifact_dir }}
+          if-no-files-found: error
+          retention-days: 30
