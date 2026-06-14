@@ -568,7 +568,7 @@ def make_all_cases_residuals_comparison_figure(
     return fig
 
 
-def make_case_subplots(case_names: Sequence[str]) -> tuple[Figure, np.ndarray]:
+def make_case_subplots(case_names: Sequence[str]) -> tuple[Figure, list[Axes]]:
     row_count = int(np.ceil(len(case_names) / 2))
     fig, axes_grid = plt.subplots(
         row_count,
@@ -579,7 +579,7 @@ def make_case_subplots(case_names: Sequence[str]) -> tuple[Figure, np.ndarray]:
     axes = axes_grid.ravel()
     for ax in axes[len(case_names) :]:
         ax.set_visible(False)
-    return fig, axes[: len(case_names)]
+    return fig, list(axes[: len(case_names)])
 
 
 def plot_samples_comparison(
