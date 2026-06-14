@@ -1,13 +1,12 @@
 name: Sandwich Integration Artifacts
 
 on:
-  pull_request:
-    branches: [ master ]
-    types: [ closed ]
+  push:
+    branches:
+      - "**"
 
 jobs:
   generate:
-    if: github.event.pull_request.merged == true
     name: ${{ matrix.case }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -25,8 +24,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: master
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,7 +67,6 @@ jobs:
           retention-days: 30
 
   aggregate:
-    if: github.event.pull_request.merged == true
     name: aggregate-comparisons
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -78,8 +74,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: master
 
       - name: Set up Python
         uses: actions/setup-python@v5
