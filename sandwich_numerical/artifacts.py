@@ -335,6 +335,7 @@ def write_run_readme(
     row_count = run.block_height * len(run.grad_factors)
     full_thickness = (row_count - 1) * run.grid_step
     layer_count = len(run.grad_factors)
+    load_description = LOAD_DESCRIPTION_BY_GRADIENT_PROFILE[run.gradient_profile]
     if output_lines is None:
         output_lines = (
             "`fdm/` contains finite-difference CSV/PNG artifacts.",
@@ -357,7 +358,7 @@ def write_run_readme(
             "## Boundary Load",
             "",
             f"- Profile: {run.gradient_profile}",
-            f"- Definition: {LOAD_DESCRIPTION_BY_GRADIENT_PROFILE[run.gradient_profile]}",
+            f"- Definition: {load_description}",
             f"- Discrete min/max: {gradient.min():.12g} / {gradient.max():.12g}",
             f"- Discrete max |load|: {np.max(np.abs(gradient)):.12g}",
             "",
