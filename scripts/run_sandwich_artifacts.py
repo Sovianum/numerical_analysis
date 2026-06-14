@@ -50,6 +50,7 @@ def main() -> None:
 
     for index, run in enumerate(runs, start=1):
         case_dir = output_dir / run.name
+        artifacts.write_run_readme(case_dir, run)
         for solver_name in solver_names:
             artifacts.run_case_to_dir(
                 run,

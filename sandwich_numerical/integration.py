@@ -119,6 +119,7 @@ def build_gradient_vector(run: SandwichRun) -> np.ndarray:
         full_thickness = (height - 1) * run.grid_step
         x = np.linspace(-full_thickness / 2, full_thickness / 2, height)
         gradient = x**2 - full_thickness**2 / 12
+        gradient = gradient / np.max(np.abs(gradient))
     else:
         raise ValueError(f"Unsupported gradient profile: {run.gradient_profile}")
 

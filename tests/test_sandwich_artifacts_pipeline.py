@@ -112,6 +112,9 @@ def test_unified_cli_local_csv_smoke(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     case_dir = output_dir / "grad_factors_1_1_1_load_sin"
+    readme = case_dir / "README.md"
+    assert readme.exists()
+    assert "Layers: 3" in readme.read_text(encoding="utf-8")
     for solver_name in artifacts.SOLVER_NAMES:
         assert (case_dir / solver_name / "samples.csv").exists()
         assert (case_dir / solver_name / "displacement.csv").exists()
