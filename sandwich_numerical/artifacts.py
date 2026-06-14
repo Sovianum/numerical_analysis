@@ -24,6 +24,7 @@ import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
 from sandwich_numerical.integration import (  # noqa: E402
+    build_gradient_vector,
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
     GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILES,
@@ -61,6 +62,16 @@ LAYER_GRID_ALPHA = 0.18
 LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
     GRADIENT_PROFILE_SINE: "load_sin",
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
+}
+LOAD_DESCRIPTION_BY_GRADIENT_PROFILE = {
+    GRADIENT_PROFILE_SINE: (
+        "sin(2*pi*i/(height - 1)); zero at the lower and upper boundaries, "
+        "with max absolute value close to 1 on the discrete mesh"
+    ),
+    GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: (
+        "6*(x/L)^2 - 1/2 for centered thickness coordinate x in [-L/2, L/2]; "
+        "symmetric, zero mean, with max absolute value 1"
+    ),
 }
 SOLVER_NAMES = ("fdm", "fem")
 
@@ -255,6 +266,15 @@ def run_case(
     write_figures: bool = True,
 ) -> None:
     case_dir = output_dir / run.name
+    write_run_readme(
+        case_dir,
+        run,
+        output_lines=(
+            "`residuals.csv`, `samples.csv`, `displacement.csv`, and "
+            "`parameters.csv` contain this solver's tabular artifacts.",
+            "PNG figures are written beside the CSV files when figures are enabled.",
+        ),
+    )
     run_case_to_dir(
         run,
         case_dir,
@@ -303,6 +323,52 @@ def run_case_to_dir(
         write_solution_figures(case_dir, run, solution)
 
     print(f"  wrote {case_dir}")
+
+
+def write_run_readme(
+    case_dir: Path,
+    run: SandwichRun,
+    output_lines: Sequence[str] | None = None,
+) -> None:
+    case_dir.mkdir(parents=True, exist_ok=True)
+    gradient = build_gradient_vector(run)
+    row_count = run.block_height * len(run.grad_factors)
+    full_thickness = (row_count - 1) * run.grid_step
+    layer_count = len(run.grad_factors)
+    load_description = LOAD_DESCRIPTION_BY_GRADIENT_PROFILE[run.gradient_profile]
+    if output_lines is None:
+        output_lines = (
+            "`fdm/` contains finite-difference CSV/PNG artifacts.",
+            "`fem/` contains finite-element CSV/PNG artifacts.",
+            "`comparison/` contains cross-solver comparison figures.",
+        )
+    readme = "\n".join(
+        [
+            f"# {run.name}",
+            "",
+            "## Scenario",
+            "",
+            f"- Layers: {layer_count}",
+            f"- Rows per layer: {run.block_height}",
+            f"- Columns: {run.block_width}",
+            f"- Grid step: {run.grid_step:g}",
+            f"- Full thickness: {full_thickness:g}",
+            f"- Gradient factors by layer: {run.grad_factors}",
+            "",
+            "## Boundary Load",
+            "",
+            f"- Profile: {run.gradient_profile}",
+            f"- Definition: {load_description}",
+            f"- Discrete min/max: {gradient.min():.12g} / {gradient.max():.12g}",
+            f"- Discrete max |load|: {np.max(np.abs(gradient)):.12g}",
+            "",
+            "## Outputs",
+            "",
+            *(f"- {line}" for line in output_lines),
+            "",
+        ]
+    )
+    (case_dir / "README.md").write_text(readme, encoding="utf-8")
 
 
 def report_progress(

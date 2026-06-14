@@ -87,6 +87,39 @@ poetry run pytest tests/ --cov=sandwich_numerical --cov-report=html
 poetry run pytest tests/ --cov=sandwich_numerical --cov-report=term-missing
 ```
 
+### Sandwich Integration Scenarios
+
+The reproducible integration artifacts compare FDM and FEM solutions for a
+rectangular sandwich domain with `grid_step=0.005`, `block_height=21`, and
+`block_width=3000` unless overridden from the CLI.
+
+Configured layer scenarios:
+
+- `grad_factors_1_1_1` - 3 layers with gradient factors `(1.0, 1.0, 1.0)`.
+- `grad_factors_1_1000_1` - 3 layers with a stiff middle layer, gradient factors `(1.0, 1000.0, 1.0)`.
+- `grad_factors_1000_1_1000_1_1000` - 5 alternating layers with gradient factors `(1000.0, 1.0, 1000.0, 1.0, 1000.0)`.
+
+Each scenario is run with two left-boundary load profiles:
+
+- `sine` - `sin(2*pi*i/(height - 1))`, zero at the lower and upper boundaries, with max absolute value close to 1 on the discrete mesh.
+- `parabolic_zero_mean` - `6*(x/L)^2 - 1/2`, where `x` is the centered thickness coordinate in `[-L/2, L/2]`; this keeps the profile symmetric and zero-mean while making `max |load| = 1`.
+
+The parabolic profile is chosen to compare a symmetric non-sinusoidal load shape
+against the sine case without adding a net boundary-gradient bias or a different
+load amplitude scale.
+
+Generate local artifacts with:
+
+```bash
+poetry run python scripts/run_sandwich_artifacts.py \
+  --mode local \
+  --all-cases \
+  --output-dir artifacts/local_sandwich_integration
+```
+
+Each generated run directory contains a short `README.md` with the layer count,
+gradient factors, load profile, and output layout for that run.
+
 ## Key Components
 
 ### Sandwich Class
