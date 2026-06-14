@@ -23,6 +23,7 @@ pandas = "^1.3.0"
 plotly = "^5.0.0"
 matplotlib = "^3.10.9"
 scikit-fem = "^12.0.1"
+scipy = "^1.11.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.0.0"
@@ -51,7 +52,7 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["pandas", "pandas.*", "plotly.*", "skfem", "skfem.*"]
+module = ["pandas", "pandas.*", "plotly.*", "scipy", "scipy.*", "skfem", "skfem.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
