@@ -6,7 +6,7 @@ import argparse
 import dataclasses
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -53,6 +53,7 @@ LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
     GRADIENT_PROFILE_SINE: "load_sin",
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
 }
+SOLVER_NAMES = ("fdm", "fem")
 
 
 def case_name_for_gradient_profile(case_name: str, gradient_profile: str) -> str:
@@ -68,6 +69,14 @@ def load_specific_case_aliases() -> dict[str, tuple[str, str]]:
         for run in SANDWICH_RUNS
         for gradient_profile in GRADIENT_PROFILES
     }
+
+
+def ci_case_names() -> tuple[str, ...]:
+    return tuple(
+        case_name_for_gradient_profile(run.name, gradient_profile)
+        for run in SANDWICH_RUNS
+        for gradient_profile in GRADIENT_PROFILES
+    )
 
 
 def case_choices() -> tuple[str, ...]:
@@ -237,10 +246,29 @@ def run_case(
     write_figures: bool = True,
 ) -> None:
     case_dir = output_dir / run.name
+    run_case_to_dir(
+        run,
+        case_dir,
+        solve_case=solve_case,
+        write_figures=write_figures,
+        case_index=case_index,
+        case_count=case_count,
+    )
+
+
+def run_case_to_dir(
+    run: SandwichRun,
+    case_dir: Path,
+    solve_case: CaseSolver,
+    write_figures: bool = True,
+    case_index: int = 1,
+    case_count: int = 1,
+    label: str | None = None,
+) -> None:
     case_dir.mkdir(parents=True, exist_ok=True)
 
     print("")
-    print(f"[{case_index}/{case_count}] {run.name}")
+    print(f"[{case_index}/{case_count}] {label or run.name}")
     print(
         "  block_size="
         f"({run.block_height}, {run.block_width}), "
@@ -391,6 +419,214 @@ def make_residuals_figure(residuals: pd.DataFrame, title: str) -> Figure:
     ax.set_ylabel("residual")
     ax.grid(True, alpha=0.3)
     return fig
+
+
+def write_case_comparison_figures(
+    case_dir: Path, run: SandwichRun, write_figures: bool = True
+) -> None:
+    comparison_dir = case_dir / "comparison"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    if not write_figures:
+        return
+
+    samples_by_solver = load_solver_csvs(case_dir, "samples.csv")
+    residuals_by_solver = load_solver_csvs(case_dir, "residuals.csv")
+    write_figure_png(
+        make_solver_samples_comparison_figure(
+            samples_by_solver,
+            f"Displacement sections {run.name}",
+            layer_boundary_x2(run),
+        ),
+        comparison_dir / "displacement_sections.png",
+    )
+    write_figure_png(
+        make_solver_residuals_comparison_figure(
+            residuals_by_solver,
+            f"Residuals {run.name}",
+        ),
+        comparison_dir / "residuals.png",
+    )
+
+
+def write_all_cases_comparison_figures(
+    output_dir: Path, case_names: Sequence[str] | None = None
+) -> None:
+    cases = tuple(case_names or discover_case_directories(output_dir))
+    if not cases:
+        raise FileNotFoundError(f"No case directories found in {output_dir}")
+
+    samples_by_case = {
+        case_name: load_solver_csvs(output_dir / case_name, "samples.csv")
+        for case_name in cases
+    }
+    residuals_by_case = {
+        case_name: load_solver_csvs(output_dir / case_name, "residuals.csv")
+        for case_name in cases
+    }
+    runs_by_case = {case_name: run_for_case_name(case_name) for case_name in cases}
+
+    comparison_dir = output_dir / "comparison"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    write_figure_png(
+        make_all_cases_samples_comparison_figure(samples_by_case, runs_by_case),
+        comparison_dir / "displacement_sections_all_cases.png",
+        width=1600,
+        height=1800,
+    )
+    write_figure_png(
+        make_all_cases_residuals_comparison_figure(residuals_by_case),
+        comparison_dir / "residuals_all_cases.png",
+        width=1600,
+        height=1800,
+    )
+
+
+def discover_case_directories(output_dir: Path) -> tuple[str, ...]:
+    known_cases = [
+        case_name
+        for case_name in ci_case_names()
+        if (output_dir / case_name).is_dir()
+    ]
+    if known_cases:
+        return tuple(known_cases)
+    return tuple(sorted(path.name for path in output_dir.iterdir() if path.is_dir()))
+
+
+def load_solver_csvs(case_dir: Path, file_name: str) -> dict[str, pd.DataFrame]:
+    tables = {}
+    for solver_name in SOLVER_NAMES:
+        path = case_dir / solver_name / file_name
+        if path.exists():
+            tables[solver_name] = pd.read_csv(path)
+    missing = sorted(set(SOLVER_NAMES) - set(tables))
+    if missing:
+        raise FileNotFoundError(
+            f"Missing {file_name} for solvers {missing} in {case_dir}"
+        )
+    return tables
+
+
+def run_for_case_name(case_name: str) -> SandwichRun:
+    aliases = load_specific_case_aliases()
+    runs_by_name = {run.name: run for run in SANDWICH_RUNS}
+    if case_name in aliases:
+        base_case_name, gradient_profile = aliases[case_name]
+        return dataclasses.replace(
+            runs_by_name[base_case_name],
+            name=case_name,
+            gradient_profile=gradient_profile,
+        )
+    return runs_by_name[case_name]
+
+
+def make_solver_samples_comparison_figure(
+    samples_by_solver: Mapping[str, pd.DataFrame],
+    title: str,
+    layer_boundaries: np.ndarray | None = None,
+) -> Figure:
+    fig, ax = plt.subplots(figsize=(11.2, 6.5))
+    plot_samples_comparison(ax, samples_by_solver, layer_boundaries)
+    ax.set_title(title)
+    ax.legend(ncol=2, fontsize="small")
+    return fig
+
+
+def make_solver_residuals_comparison_figure(
+    residuals_by_solver: Mapping[str, pd.DataFrame], title: str
+) -> Figure:
+    fig, ax = plt.subplots(figsize=(11.2, 6.5))
+    plot_residuals_comparison(ax, residuals_by_solver)
+    ax.set_title(title)
+    ax.legend()
+    return fig
+
+
+def make_all_cases_samples_comparison_figure(
+    samples_by_case: Mapping[str, Mapping[str, pd.DataFrame]],
+    runs_by_case: Mapping[str, SandwichRun],
+) -> Figure:
+    case_names = tuple(samples_by_case)
+    fig, axes = make_case_subplots(case_names)
+    for ax, case_name in zip(axes, case_names):
+        plot_samples_comparison(
+            ax,
+            samples_by_case[case_name],
+            layer_boundary_x2(runs_by_case[case_name]),
+        )
+        ax.set_title(case_name)
+    add_shared_legend(fig, axes)
+    return fig
+
+
+def make_all_cases_residuals_comparison_figure(
+    residuals_by_case: Mapping[str, Mapping[str, pd.DataFrame]]
+) -> Figure:
+    case_names = tuple(residuals_by_case)
+    fig, axes = make_case_subplots(case_names)
+    for ax, case_name in zip(axes, case_names):
+        plot_residuals_comparison(ax, residuals_by_case[case_name])
+        ax.set_title(case_name)
+    add_shared_legend(fig, axes)
+    return fig
+
+
+def make_case_subplots(case_names: Sequence[str]) -> tuple[Figure, np.ndarray]:
+    row_count = int(np.ceil(len(case_names) / 2))
+    fig, axes_grid = plt.subplots(
+        row_count,
+        2,
+        figsize=(16, max(5, row_count * 4.5)),
+        squeeze=False,
+    )
+    axes = axes_grid.ravel()
+    for ax in axes[len(case_names) :]:
+        ax.set_visible(False)
+    return fig, axes[: len(case_names)]
+
+
+def plot_samples_comparison(
+    ax: Axes,
+    samples_by_solver: Mapping[str, pd.DataFrame],
+    layer_boundaries: np.ndarray | None = None,
+) -> None:
+    linestyles = {"fdm": "-", "fem": "--"}
+    for solver_name in SOLVER_NAMES:
+        samples = samples_by_solver[solver_name]
+        for column in samples.columns:
+            if column == "x2":
+                continue
+            ax.plot(
+                samples["x2"],
+                samples[column],
+                label=f"{solver_name} {column}",
+                linestyle=linestyles[solver_name],
+            )
+    add_vertical_layer_boundaries(ax, layer_boundaries)
+    ax.set_xlabel("x2")
+    ax.set_ylabel("displacement")
+    ax.grid(True, alpha=0.3)
+
+
+def plot_residuals_comparison(
+    ax: Axes, residuals_by_solver: Mapping[str, pd.DataFrame]
+) -> None:
+    markers = {"fdm": "o", "fem": "s"}
+    for solver_name in SOLVER_NAMES:
+        residuals = residuals_by_solver[solver_name]
+        ax.plot(
+            residuals["iteration"],
+            residuals["residual"],
+            label=solver_name,
+            marker=markers[solver_name],
+        )
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("residual")
+    ax.grid(True, alpha=0.3)
+
+
+def add_shared_legend(fig: Figure, axes: Sequence[Axes]) -> None:
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=4, fontsize="small")
 
 
 def make_displacement_norm(data: np.ndarray) -> Normalize | None:
