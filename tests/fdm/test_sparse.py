@@ -10,7 +10,11 @@ import numpy as np
 import pytest
 
 from sandwich_numerical.fdm.integration import solve_case
-from sandwich_numerical.fdm.sparse import assemble_system, solve_displacement
+from sandwich_numerical.fdm.sparse import (
+    assemble_system,
+    node_index,
+    solve_displacement,
+)
 from sandwich_numerical.integration import (
     SandwichRun,
     mesh_height,
@@ -46,6 +50,23 @@ def test_sparse_matrix_has_expected_size() -> None:
     assert system.matrix.shape == (expected_size, expected_size)
     assert system.rhs.shape == (expected_size,)
     assert system.constrained_dofs.shape == (mesh_height(run),)
+
+
+def test_top_and_bottom_rows_use_half_control_volume_stencil() -> None:
+    run = small_run(grad_factors=(1.0, 1.0, 1.0))
+    gradient = np.zeros(mesh_height(run))
+
+    system = assemble_system(run, gradient)
+    matrix = system.matrix
+    width = run.block_width
+    h2 = run.grid_step * run.grid_step
+    bottom = node_index(0, 1, width)
+    bottom_neighbor = node_index(1, 1, width)
+    top = node_index(mesh_height(run) - 1, 1, width)
+    top_neighbor = node_index(mesh_height(run) - 2, 1, width)
+
+    assert matrix[bottom, bottom_neighbor] == pytest.approx(-2.0 / h2)
+    assert matrix[top, top_neighbor] == pytest.approx(-2.0 / h2)
 
 
 def test_sparse_displacement_has_artifact_grid_shape() -> None:
