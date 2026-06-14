@@ -43,7 +43,7 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
     row_count = height * width
     matrix = sparse.lil_matrix((row_count, row_count), dtype=float)
     rhs = np.zeros(row_count, dtype=float)
-    h2 = run.grid_step * run.grid_step
+    h_square = run.grid_step * run.grid_step
 
     for row in range(height):
         for column in range(width):
@@ -58,16 +58,19 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
             if column == 0:
                 rhs[dof] -= center_coefficient * gradient[row] / run.grid_step
             else:
-                west = center_coefficient / h2
+                west = center_coefficient / h_square
                 diagonal += west
                 matrix[dof, node_index(row, column - 1, width)] = -west
 
-            east = center_coefficient / h2
+            east = center_coefficient / h_square
             diagonal += east
             matrix[dof, node_index(row, column + 1, width)] = -east
 
             if row > 0:
-                south = harmonic_mean(center_coefficient, coefficients[row - 1]) / h2
+                south = (
+                    harmonic_mean(center_coefficient, coefficients[row - 1])
+                    / h_square
+                )
                 # Physical top/bottom rows have half-height control volumes.
                 if row == height - 1:
                     south *= 2.0
@@ -75,7 +78,10 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
                 matrix[dof, node_index(row - 1, column, width)] = -south
 
             if row < height - 1:
-                north = harmonic_mean(center_coefficient, coefficients[row + 1]) / h2
+                north = (
+                    harmonic_mean(center_coefficient, coefficients[row + 1])
+                    / h_square
+                )
                 # Physical top/bottom rows have half-height control volumes.
                 if row == 0:
                     north *= 2.0

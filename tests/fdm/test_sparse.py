@@ -59,14 +59,14 @@ def test_top_and_bottom_rows_use_half_control_volume_stencil() -> None:
     system = assemble_system(run, gradient)
     matrix = system.matrix
     width = run.block_width
-    h2 = run.grid_step * run.grid_step
+    h_square = run.grid_step * run.grid_step
     bottom = node_index(0, 1, width)
     bottom_neighbor = node_index(1, 1, width)
     top = node_index(mesh_height(run) - 1, 1, width)
     top_neighbor = node_index(mesh_height(run) - 2, 1, width)
 
-    assert matrix[bottom, bottom_neighbor] == pytest.approx(-2.0 / h2)
-    assert matrix[top, top_neighbor] == pytest.approx(-2.0 / h2)
+    assert matrix[bottom, bottom_neighbor] == pytest.approx(-2.0 / h_square)
+    assert matrix[top, top_neighbor] == pytest.approx(-2.0 / h_square)
 
 
 def test_sparse_displacement_has_artifact_grid_shape() -> None:
