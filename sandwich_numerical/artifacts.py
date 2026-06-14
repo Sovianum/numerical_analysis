@@ -6,7 +6,7 @@ import argparse
 import dataclasses
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -49,10 +49,20 @@ class CaseSolver(Protocol):
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
 DISPLACEMENT_CMAP = "bwr"
+LAYER_GRID_SUBDIVISIONS = 5
+LAYER_BOUNDARY_COLOR = "black"
+LAYER_BOUNDARY_LINESTYLE = "-"
+LAYER_BOUNDARY_LINEWIDTH = 1.4
+LAYER_BOUNDARY_ALPHA = 0.9
+LAYER_GRID_COLOR = "black"
+LAYER_GRID_LINESTYLE = "-"
+LAYER_GRID_LINEWIDTH = 0.45
+LAYER_GRID_ALPHA = 0.18
 LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
     GRADIENT_PROFILE_SINE: "load_sin",
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
 }
+SOLVER_NAMES = ("fdm", "fem")
 
 
 def case_name_for_gradient_profile(case_name: str, gradient_profile: str) -> str:
@@ -68,6 +78,14 @@ def load_specific_case_aliases() -> dict[str, tuple[str, str]]:
         for run in SANDWICH_RUNS
         for gradient_profile in GRADIENT_PROFILES
     }
+
+
+def ci_case_names() -> tuple[str, ...]:
+    return tuple(
+        case_name_for_gradient_profile(run.name, gradient_profile)
+        for run in SANDWICH_RUNS
+        for gradient_profile in GRADIENT_PROFILES
+    )
 
 
 def case_choices() -> tuple[str, ...]:
@@ -237,10 +255,29 @@ def run_case(
     write_figures: bool = True,
 ) -> None:
     case_dir = output_dir / run.name
+    run_case_to_dir(
+        run,
+        case_dir,
+        solve_case=solve_case,
+        write_figures=write_figures,
+        case_index=case_index,
+        case_count=case_count,
+    )
+
+
+def run_case_to_dir(
+    run: SandwichRun,
+    case_dir: Path,
+    solve_case: CaseSolver,
+    write_figures: bool = True,
+    case_index: int = 1,
+    case_count: int = 1,
+    label: str | None = None,
+) -> None:
     case_dir.mkdir(parents=True, exist_ok=True)
 
     print("")
-    print(f"[{case_index}/{case_count}] {run.name}")
+    print(f"[{case_index}/{case_count}] {label or run.name}")
     print(
         "  block_size="
         f"({run.block_height}, {run.block_width}), "
@@ -313,10 +350,6 @@ def write_solution_figures(
         ),
         case_dir / "samples.png",
     )
-    write_figure_png(
-        make_residuals_figure(solution.residuals, f"Residual {run.name}"),
-        case_dir / "residuals.png",
-    )
 
 
 def make_heatmap_figure(
@@ -333,6 +366,7 @@ def make_heatmap_figure(
     ax.set_title(title)
     ax.set_xlabel("x1 column")
     ax.set_ylabel("x2 row")
+    add_layer_aligned_y_grid(ax, layer_boundaries)
     add_horizontal_layer_boundaries(ax, layer_boundaries, data.shape[0])
     fig.colorbar(image, ax=ax, label="displacement")
     return fig
@@ -346,11 +380,12 @@ def make_samples_figure(
         if column == "x2":
             continue
         ax.plot(samples["x2"], samples[column], label=column)
+    add_layer_aligned_x_grid(ax, layer_boundaries)
     add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_title(title)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, axis="y", alpha=0.3)
     ax.legend()
     return fig
 
@@ -363,7 +398,12 @@ def add_horizontal_layer_boundaries(
     for boundary in layer_boundaries:
         if 0 < boundary < row_count - 1:
             ax.axhline(
-                boundary, color="black", linestyle="--", linewidth=0.8, alpha=0.5
+                boundary,
+                color=LAYER_BOUNDARY_COLOR,
+                linestyle=LAYER_BOUNDARY_LINESTYLE,
+                linewidth=LAYER_BOUNDARY_LINEWIDTH,
+                alpha=LAYER_BOUNDARY_ALPHA,
+                zorder=4,
             )
 
 
@@ -375,11 +415,12 @@ def add_vertical_layer_boundaries(
     for index, boundary in enumerate(layer_boundaries):
         ax.axvline(
             boundary,
-            color="black",
-            linestyle="--",
-            linewidth=0.8,
-            alpha=0.5,
+            color=LAYER_BOUNDARY_COLOR,
+            linestyle=LAYER_BOUNDARY_LINESTYLE,
+            linewidth=LAYER_BOUNDARY_LINEWIDTH,
+            alpha=LAYER_BOUNDARY_ALPHA,
             label="layer boundary" if index == 0 else "_nolegend_",
+            zorder=4,
         )
 
 
@@ -391,6 +432,235 @@ def make_residuals_figure(residuals: pd.DataFrame, title: str) -> Figure:
     ax.set_ylabel("residual")
     ax.grid(True, alpha=0.3)
     return fig
+
+
+def write_case_comparison_figures(
+    case_dir: Path, run: SandwichRun, write_figures: bool = True
+) -> None:
+    comparison_dir = case_dir / "comparison"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    if not write_figures:
+        return
+
+    samples_by_solver = load_solver_csvs(case_dir, "samples.csv")
+    write_figure_png(
+        make_solver_samples_comparison_figure(
+            samples_by_solver,
+            f"Displacement sections {run.name}",
+            layer_boundary_x2(run),
+        ),
+        comparison_dir / "displacement_sections.png",
+    )
+
+
+def write_all_cases_comparison_figures(
+    output_dir: Path, case_names: Sequence[str] | None = None
+) -> None:
+    cases = tuple(case_names or discover_case_directories(output_dir))
+    if not cases:
+        raise FileNotFoundError(f"No case directories found in {output_dir}")
+
+    samples_by_case = {
+        case_name: load_solver_csvs(output_dir / case_name, "samples.csv")
+        for case_name in cases
+    }
+    runs_by_case = {case_name: run_for_case_name(case_name) for case_name in cases}
+
+    comparison_dir = output_dir / "comparison"
+    comparison_dir.mkdir(parents=True, exist_ok=True)
+    write_figure_png(
+        make_all_cases_samples_comparison_figure(samples_by_case, runs_by_case),
+        comparison_dir / "displacement_sections_all_cases.png",
+        width=1600,
+        height=1800,
+    )
+
+
+def discover_case_directories(output_dir: Path) -> tuple[str, ...]:
+    known_cases = [
+        case_name for case_name in ci_case_names() if (output_dir / case_name).is_dir()
+    ]
+    if known_cases:
+        return tuple(known_cases)
+    return tuple(sorted(path.name for path in output_dir.iterdir() if path.is_dir()))
+
+
+def load_solver_csvs(case_dir: Path, file_name: str) -> dict[str, pd.DataFrame]:
+    tables = {}
+    for solver_name in SOLVER_NAMES:
+        path = case_dir / solver_name / file_name
+        if path.exists():
+            tables[solver_name] = pd.read_csv(path)
+    missing = sorted(set(SOLVER_NAMES) - set(tables))
+    if missing:
+        raise FileNotFoundError(
+            f"Missing {file_name} for solvers {missing} in {case_dir}"
+        )
+    return tables
+
+
+def run_for_case_name(case_name: str) -> SandwichRun:
+    aliases = load_specific_case_aliases()
+    runs_by_name = {run.name: run for run in SANDWICH_RUNS}
+    if case_name in aliases:
+        base_case_name, gradient_profile = aliases[case_name]
+        return dataclasses.replace(
+            runs_by_name[base_case_name],
+            name=case_name,
+            gradient_profile=gradient_profile,
+        )
+    return runs_by_name[case_name]
+
+
+def make_solver_samples_comparison_figure(
+    samples_by_solver: Mapping[str, pd.DataFrame],
+    title: str,
+    layer_boundaries: np.ndarray | None = None,
+) -> Figure:
+    fig, ax = plt.subplots(figsize=(11.2, 6.5))
+    plot_samples_comparison(ax, samples_by_solver, layer_boundaries)
+    ax.set_title(title)
+    ax.legend(ncol=2, fontsize="small")
+    return fig
+
+
+def make_all_cases_samples_comparison_figure(
+    samples_by_case: Mapping[str, Mapping[str, pd.DataFrame]],
+    runs_by_case: Mapping[str, SandwichRun],
+) -> Figure:
+    case_names = tuple(samples_by_case)
+    fig, axes = make_case_subplots(case_names)
+    for ax, case_name in zip(axes, case_names):
+        plot_samples_comparison(
+            ax,
+            samples_by_case[case_name],
+            layer_boundary_x2(runs_by_case[case_name]),
+        )
+        ax.set_title(case_name)
+    add_shared_legend(fig, axes)
+    return fig
+
+
+def make_case_subplots(case_names: Sequence[str]) -> tuple[Figure, list[Axes]]:
+    row_count = int(np.ceil(len(case_names) / 2))
+    fig, axes_grid = plt.subplots(
+        row_count,
+        2,
+        figsize=(16, max(5, row_count * 4.5)),
+        squeeze=False,
+    )
+    axes = axes_grid.ravel()
+    for ax in axes[len(case_names) :]:
+        ax.set_visible(False)
+    return fig, list(axes[: len(case_names)])
+
+
+def plot_samples_comparison(
+    ax: Axes,
+    samples_by_solver: Mapping[str, pd.DataFrame],
+    layer_boundaries: np.ndarray | None = None,
+) -> None:
+    linestyles = {"fdm": "-", "fem": "--"}
+    for solver_name in SOLVER_NAMES:
+        samples = samples_by_solver[solver_name]
+        for column in samples.columns:
+            if column == "x2":
+                continue
+            ax.plot(
+                samples["x2"],
+                samples[column],
+                label=f"{solver_name} {column}",
+                linestyle=linestyles[solver_name],
+            )
+    ax.set_xlabel("x2")
+    ax.set_ylabel("displacement")
+    add_layer_aligned_x_grid(ax, layer_boundaries)
+    add_vertical_layer_boundaries(ax, layer_boundaries)
+    ax.grid(True, axis="y", alpha=0.3)
+
+
+def add_layer_aligned_x_grid(ax: Axes, layer_boundaries: np.ndarray | None) -> None:
+    ticks = layer_aligned_ticks(layer_boundaries, *ax.get_xlim())
+    if ticks.size == 0:
+        ax.grid(True, alpha=0.3)
+        return
+
+    ax.set_xticks(ticks, minor=True)
+    ax.tick_params(axis="x", which="minor", length=0)
+    ax.grid(False, axis="x", which="major")
+    ax.grid(
+        True,
+        axis="x",
+        which="minor",
+        color=LAYER_GRID_COLOR,
+        linestyle=LAYER_GRID_LINESTYLE,
+        linewidth=LAYER_GRID_LINEWIDTH,
+        alpha=LAYER_GRID_ALPHA,
+    )
+
+
+def add_layer_aligned_y_grid(ax: Axes, layer_boundaries: np.ndarray | None) -> None:
+    ticks = layer_aligned_ticks(layer_boundaries, *ax.get_ylim())
+    if ticks.size == 0:
+        return
+
+    ax.set_yticks(ticks, minor=True)
+    ax.tick_params(axis="y", which="minor", length=0)
+    ax.grid(
+        True,
+        axis="y",
+        which="minor",
+        color=LAYER_GRID_COLOR,
+        linestyle=LAYER_GRID_LINESTYLE,
+        linewidth=LAYER_GRID_LINEWIDTH,
+        alpha=LAYER_GRID_ALPHA,
+    )
+
+
+def layer_aligned_ticks(
+    layer_boundaries: np.ndarray | None,
+    lower: float,
+    upper: float,
+    subdivisions: int = LAYER_GRID_SUBDIVISIONS,
+) -> np.ndarray:
+    if layer_boundaries is None or subdivisions <= 0:
+        return np.array([], dtype=float)
+
+    boundaries = np.asarray(layer_boundaries, dtype=float)
+    boundaries = np.sort(boundaries[np.isfinite(boundaries)])
+    if boundaries.size == 0:
+        return np.array([], dtype=float)
+
+    axis_min = min(lower, upper)
+    axis_max = max(lower, upper)
+    layer_thickness = infer_layer_thickness(boundaries, axis_min, axis_max)
+    if layer_thickness <= 0:
+        return np.array([], dtype=float)
+
+    spacing = layer_thickness / subdivisions
+    layers_before = int(np.ceil((boundaries[0] - axis_min) / layer_thickness))
+    first_layer_start = boundaries[0] - layers_before * layer_thickness
+    count = int(np.ceil((axis_max - first_layer_start) / spacing)) + 1
+    ticks = first_layer_start + spacing * np.arange(count + 1, dtype=float)
+    tolerance = spacing * 1e-6
+    return np.asarray(
+        ticks[(axis_min - tolerance <= ticks) & (ticks <= axis_max + tolerance)],
+        dtype=float,
+    )
+
+
+def infer_layer_thickness(
+    layer_boundaries: np.ndarray, axis_min: float, axis_max: float
+) -> float:
+    if layer_boundaries.size >= 2:
+        return float(np.median(np.diff(layer_boundaries)))
+
+    return float(max(layer_boundaries[0] - axis_min, axis_max - layer_boundaries[0]))
+
+
+def add_shared_legend(fig: Figure, axes: Sequence[Axes]) -> None:
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=4, fontsize="small")
 
 
 def make_displacement_norm(data: np.ndarray) -> Normalize | None:

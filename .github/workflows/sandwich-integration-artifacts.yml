@@ -56,7 +56,8 @@ jobs:
 
       - name: Generate Sandwich integration artifacts
         run: |
-          poetry run python scripts/fdm/run_sandwich_integration.py \
+          poetry run python scripts/run_sandwich_artifacts.py \
+            --mode ci \
             --case "${{ matrix.case }}" \
             --output-dir artifacts/sandwich_integration
 
@@ -64,6 +65,66 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sandwich-integration-${{ matrix.case }}
-          path: artifacts/sandwich_integration/${{ matrix.case }}
+          path: artifacts/sandwich_integration
+          if-no-files-found: error
+          retention-days: 30
+
+  aggregate:
+    if: github.event.pull_request.merged == true
+    name: aggregate-comparisons
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: generate
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: sandwich-integration-venv-${{ runner.os }}-3.11-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction --only-root
+
+      - name: Download Sandwich integration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: sandwich-integration-*
+          path: artifacts/sandwich_integration
+          merge-multiple: true
+
+      - name: Generate aggregate comparison artifacts
+        run: |
+          poetry run python scripts/run_sandwich_artifacts.py \
+            --mode ci \
+            --aggregate-only \
+            --output-dir artifacts/sandwich_integration
+
+      - name: Upload aggregate Sandwich comparison artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandwich-integration-comparison
+          path: artifacts/sandwich_integration/comparison
           if-no-files-found: error
           retention-days: 30
