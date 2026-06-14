@@ -4,7 +4,7 @@ Tests for the MeshBlock class.
 
 import pytest
 import numpy as np
-from sandwich_numerical.solver.mesh_block import MeshBlock, BoundaryType
+from sandwich_numerical.fdm.solver.mesh_block import MeshBlock, BoundaryType
 
 
 class TestMeshBlock:

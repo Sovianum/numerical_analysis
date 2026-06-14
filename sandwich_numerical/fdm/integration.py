@@ -10,7 +10,7 @@ from typing import Callable
 import numpy as np
 import pandas as pd
 
-from sandwich_numerical.sandwich import Sandwich
+from .sandwich import Sandwich
 
 
 @dataclass(frozen=True)

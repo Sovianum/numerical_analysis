@@ -5,8 +5,8 @@ from collections.abc import Sequence
 import numpy as np
 import plotly.graph_objects as go
 
-from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
 from .solver.laplace import set_laplace_update
+from .solver.mesh_block import BoundaryType, MeshBlock
 
 
 def set_boundary_conditions_bottom_block(
