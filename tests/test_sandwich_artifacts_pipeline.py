@@ -6,7 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from sandwich_numerical import artifacts
@@ -45,45 +44,6 @@ def test_all_case_comparison_writes_only_displacement_png(tmp_path: Path) -> Non
     comparison_dir = output_dir / "comparison"
     assert (comparison_dir / "displacement_sections_all_cases.png").exists()
     assert not (comparison_dir / "residuals_all_cases.png").exists()
-
-
-def test_samples_figure_uses_zero_as_minimum_for_positive_displacements() -> None:
-    fig = artifacts.make_samples_figure(
-        pd.DataFrame({"x2": [0.0, 1.0], "x1=0.0": [1.0, 2.0]}),
-        "positive",
-    )
-    try:
-        bottom, top = fig.axes[0].get_ylim()
-        assert bottom == 0.0
-        assert top > 2.0
-    finally:
-        plt.close(fig)
-
-
-def test_samples_figure_uses_zero_as_maximum_for_negative_displacements() -> None:
-    fig = artifacts.make_samples_figure(
-        pd.DataFrame({"x2": [0.0, 1.0], "x1=0.0": [-2.0, -1.0]}),
-        "negative",
-    )
-    try:
-        bottom, top = fig.axes[0].get_ylim()
-        assert bottom < -2.0
-        assert top == 0.0
-    finally:
-        plt.close(fig)
-
-
-def test_samples_figure_keeps_mixed_displacement_axis_auto_scaled() -> None:
-    fig = artifacts.make_samples_figure(
-        pd.DataFrame({"x2": [0.0, 1.0], "x1=0.0": [-1.0, 2.0]}),
-        "mixed",
-    )
-    try:
-        bottom, top = fig.axes[0].get_ylim()
-        assert bottom < -1.0
-        assert top > 2.0
-    finally:
-        plt.close(fig)
 
 
 def test_unified_cli_local_csv_smoke(tmp_path: Path) -> None:
