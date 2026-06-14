@@ -8,14 +8,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sandwich_numerical.fdm.integration import (
+from sandwich_numerical.fdm.integration import solve_case
+from sandwich_numerical.integration import (
     GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
     SANDWICH_RUNS,
     SandwichRun,
     build_gradient_vector,
     parameters_data_to_df,
-    solve_case,
 )
 from scripts.fdm.run_sandwich_integration import (
     DISPLACEMENT_CMAP,
