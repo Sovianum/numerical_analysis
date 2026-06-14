@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from sandwich_numerical.integration import (
+from sandwich_numerical.fdm.integration import (
     GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
     SANDWICH_RUNS,

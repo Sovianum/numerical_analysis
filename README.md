@@ -6,13 +6,15 @@ This project contains Python implementations of numerical analysis methods, spec
 
 - `sandwich_numerical/` - Main package directory
   - `__init__.py` - Package initialization
-  - `sandwich.py` - Main implementation of the Sandwich class and related functions
+  - `fdm/` - Finite difference method implementation
+    - `sandwich.py` - Main FDM implementation of the Sandwich class and related functions
+    - `integration.py` - Reusable FDM integration scenario runner
+    - `solver/` - FDM mesh blocks, Laplace update, and mesh utilities
 - `tests/` - Test suite
   - `__init__.py` - Tests package
   - `test_sandwich.py` - Comprehensive pytest test suite
 - `scripts/` - Reproducible command-line runners
   - `run_sandwich_integration.py` - Generate Sandwich integration CSV/PNG artifacts
-- `sandwich.py` - Root-level implementation with utility functions
 - `pyproject.toml` - Poetry configuration and dependencies
 - `README.md` - This documentation file
 
@@ -49,7 +51,7 @@ The Sandwich class implements:
 ### Basic Usage
 
 ```python
-from sandwich_numerical.sandwich import Sandwich
+from sandwich_numerical.fdm.sandwich import Sandwich
 import numpy as np
 
 # Create a gradient vector
@@ -101,14 +103,14 @@ The main class that implements the numerical solver:
 
 - `set_laplace_update()` - Apply Laplace operator for numerical integration
 - `set_boundary_conditions_*_block()` - Set boundary conditions for each block type
-- `transfer_data_inwards()` / `transfer_data_outwards()` - Handle data transfer between blocks
+- `copy_boundary_values()` / `copy_boundary_gradients()` - Handle data transfer between blocks
 
-### Utility Functions (in root sandwich.py)
+### Integration Utilities
 
-- `process_mesh()` - Run multiple iterations and track residuals
-- `get_samples_df()` - Extract statistical data from the mesh
-- `plot_samples_data()` - Create statistical visualizations
+- `solve_case()` - Run a configured FDM scenario and collect residual, sample, and displacement data
+- `build_gradient_vector()` - Build the configured boundary-gradient profile
 - `displacement_data_to_df()` - Convert displacement data to DataFrame format
+- `write_solution_csvs()` - Write reproducible CSV artifacts for a scenario
 
 ## Testing
 
@@ -162,7 +164,7 @@ The Sandwich method is a numerical technique for solving partial differential eq
 
 - Divides the computational domain into multiple blocks
 - Applies appropriate boundary conditions at block interfaces
-- Uses finite difference methods (Laplace operator) for spatial discretization
+- Uses the finite difference method (Laplace operator) for spatial discretization
 - Transfers information between blocks to maintain solution continuity
 - Iteratively refines the solution until convergence
 
@@ -207,7 +209,10 @@ poetry build
 numerical_analysis/
 ├── sandwich_numerical/           # Main package
 │   ├── __init__.py              # Package initialization
-│   └── sandwich.py              # Main Sandwich class implementation
+│   ├── fdm/                     # Finite difference method implementation
+│   │   ├── integration.py       # Reusable FDM integration scenario runner
+│   │   ├── sandwich.py          # Main FDM Sandwich class implementation
+│   │   └── solver/              # FDM solver primitives
 ├── tests/                       # Test suite
 │   ├── __init__.py              # Tests package
 │   └── test_sandwich.py         # Comprehensive pytest tests
@@ -216,7 +221,6 @@ numerical_analysis/
 ├── .github/                     # GitHub configuration
 │   └── workflows/               # GitHub Actions workflows
 │       └── test.yml             # CI workflow with coverage
-├── sandwich.py                  # Root-level implementation with utilities
 ├── pyproject.toml               # Poetry configuration
 └── README.md                    # This file
 ```

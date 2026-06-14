@@ -5,15 +5,15 @@ Tests for the Sandwich numerical analysis package.
 import numpy as np
 import pytest
 
-from sandwich_numerical.sandwich import (
+from sandwich_numerical.fdm.sandwich import (
     Sandwich,
     set_boundary_conditions_bottom_block,
     set_boundary_conditions_middle_block,
     set_boundary_conditions_top_block,
 )
-from sandwich_numerical.solver.laplace import set_laplace_update
-from sandwich_numerical.solver.mesh_block import BoundaryType, MeshBlock
-from sandwich_numerical.solver.mesh_utils import (
+from sandwich_numerical.fdm.solver.laplace import set_laplace_update
+from sandwich_numerical.fdm.solver.mesh_block import BoundaryType, MeshBlock
+from sandwich_numerical.fdm.solver.mesh_utils import (
     copy_boundary_gradients,
     copy_boundary_values,
 )
