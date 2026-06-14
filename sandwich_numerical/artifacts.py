@@ -69,8 +69,8 @@ LOAD_DESCRIPTION_BY_GRADIENT_PROFILE = {
         "with max absolute value close to 1 on the discrete mesh"
     ),
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: (
-        "(x2^2 - L^2/12) normalized by its max absolute value; symmetric, "
-        "zero mean, with max absolute value 1"
+        "6*(x/L)^2 - 1/2 for centered thickness coordinate x in [-L/2, L/2]; "
+        "symmetric, zero mean, with max absolute value 1"
     ),
 }
 SOLVER_NAMES = ("fdm", "fem")

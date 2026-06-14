@@ -102,7 +102,11 @@ Configured layer scenarios:
 Each scenario is run with two left-boundary load profiles:
 
 - `sine` - `sin(2*pi*i/(height - 1))`, zero at the lower and upper boundaries, with max absolute value close to 1 on the discrete mesh.
-- `parabolic_zero_mean` - `(x2^2 - L^2/12)` normalized by its max absolute value; this keeps the profile symmetric and zero-mean while making `max |load| = 1`.
+- `parabolic_zero_mean` - `6*(x/L)^2 - 1/2`, where `x` is the centered thickness coordinate in `[-L/2, L/2]`; this keeps the profile symmetric and zero-mean while making `max |load| = 1`.
+
+The parabolic profile is chosen to compare a symmetric non-sinusoidal load shape
+against the sine case without adding a net boundary-gradient bias or a different
+load amplitude scale.
 
 Generate local artifacts with:
 
