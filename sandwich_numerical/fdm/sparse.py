@@ -62,7 +62,7 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
                 diagonal += west
                 matrix[dof, node_index(row, column - 1, width)] = -west
 
-            east = harmonic_mean(center_coefficient, coefficients[row]) / h2
+            east = center_coefficient / h2
             diagonal += east
             matrix[dof, node_index(row, column + 1, width)] = -east
 
