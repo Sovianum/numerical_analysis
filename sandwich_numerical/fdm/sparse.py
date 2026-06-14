@@ -68,8 +68,7 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
 
             if row > 0:
                 south = (
-                    harmonic_mean(center_coefficient, coefficients[row - 1])
-                    / h_square
+                    harmonic_mean(center_coefficient, coefficients[row - 1]) / h_square
                 )
                 # Physical top/bottom rows have half-height control volumes.
                 if row == height - 1:
@@ -79,8 +78,7 @@ def assemble_system(run: SandwichRun, gradient_vector: np.ndarray) -> SparseSyst
 
             if row < height - 1:
                 north = (
-                    harmonic_mean(center_coefficient, coefficients[row + 1])
-                    / h_square
+                    harmonic_mean(center_coefficient, coefficients[row + 1]) / h_square
                 )
                 # Physical top/bottom rows have half-height control volumes.
                 if row == 0:
