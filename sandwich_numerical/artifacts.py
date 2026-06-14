@@ -374,6 +374,7 @@ def make_samples_figure(
     ax.set_title(title)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
+    anchor_displacement_axis_at_zero(ax)
     ax.grid(True, alpha=0.3)
     ax.legend()
     return fig
@@ -558,7 +559,16 @@ def plot_samples_comparison(
     add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
+    anchor_displacement_axis_at_zero(ax)
     ax.grid(True, alpha=0.3)
+
+
+def anchor_displacement_axis_at_zero(ax: Axes) -> None:
+    bottom, top = ax.get_ylim()
+    if bottom > 0:
+        ax.set_ylim(bottom=0.0, top=top)
+    elif top < 0:
+        ax.set_ylim(bottom=bottom, top=0.0)
 
 
 def add_shared_legend(fig: Figure, axes: Sequence[Axes]) -> None:
