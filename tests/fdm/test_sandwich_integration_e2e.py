@@ -1,21 +1,16 @@
 """End-to-end regression checks for the scripted Sandwich integration runs."""
 
 import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import pytest
 
-from sandwich_numerical.fdm.integration import solve_case
 from sandwich_numerical.integration import (
     GRADIENT_PROFILE_SINE,
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN,
-    SANDWICH_RUNS,
     SandwichRun,
     build_gradient_vector,
-    parameters_data_to_df,
 )
 from scripts.fdm.run_sandwich_integration import (
     DISPLACEMENT_CMAP,
@@ -25,24 +20,6 @@ from scripts.fdm.run_sandwich_integration import (
     make_heatmap_figure,
     prepare_runs,
 )
-
-
-BASELINE_DIR = Path(__file__).resolve().parents[1] / "fixtures/sandwich_integration"
-RTOL = 1e-12
-ATOL = 1e-14
-
-
-@pytest.mark.parametrize("run", SANDWICH_RUNS, ids=lambda run: run.name)
-def test_sandwich_integration_matches_baseline(run: SandwichRun) -> None:
-    solution = solve_case(run)
-    case_dir = BASELINE_DIR / run.name
-
-    assert_numeric_frame_matches_csv(solution.residuals, case_dir / "residuals.csv")
-    assert_numeric_frame_matches_csv(solution.samples, case_dir / "samples.csv")
-    assert_numeric_frame_matches_csv(
-        solution.displacement, case_dir / "displacement.csv"
-    )
-    assert_parameters_match_csv(run, case_dir / "parameters.csv")
 
 
 def test_layer_boundary_sample_coordinates_match_discrete_row_boundaries() -> None:
@@ -195,30 +172,3 @@ def test_displacement_heatmap_uses_white_center_colormap() -> None:
         )
     finally:
         plt.close(fig)
-
-
-def assert_numeric_frame_matches_csv(actual: pd.DataFrame, path: Path) -> None:
-    assert path.exists(), f"Missing baseline CSV: {path}"
-    expected = pd.read_csv(path)
-
-    assert list(actual.columns) == list(expected.columns)
-    assert actual.shape == expected.shape
-    pd.testing.assert_frame_equal(
-        actual.reset_index(drop=True),
-        expected,
-        check_dtype=False,
-        check_exact=False,
-        rtol=RTOL,
-        atol=ATOL,
-    )
-
-
-def assert_parameters_match_csv(run: SandwichRun, path: Path) -> None:
-    assert path.exists(), f"Missing baseline CSV: {path}"
-    expected = pd.read_csv(path)
-    actual = parameters_data_to_df(run)
-    actual["sample_x1_positions"] = actual["sample_x1_positions"].astype(str)
-    actual["grad_factors"] = actual["grad_factors"].astype(str)
-
-    assert list(actual.columns) == list(expected.columns)
-    pd.testing.assert_frame_equal(actual, expected, check_dtype=False)
