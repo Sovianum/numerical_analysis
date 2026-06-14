@@ -17,7 +17,7 @@ from sandwich_numerical.fdm.integration import (
     parameters_data_to_df,
     solve_case,
 )
-from scripts.run_sandwich_integration import (
+from scripts.fdm.run_sandwich_integration import (
     DISPLACEMENT_CMAP,
     layer_boundary_rows,
     layer_boundary_x2,
@@ -27,7 +27,7 @@ from scripts.run_sandwich_integration import (
 )
 
 
-BASELINE_DIR = Path(__file__).resolve().parent / "fixtures/sandwich_integration"
+BASELINE_DIR = Path(__file__).resolve().parents[1] / "fixtures/sandwich_integration"
 RTOL = 1e-12
 ATOL = 1e-14
 

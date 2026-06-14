@@ -56,7 +56,7 @@ jobs:
 
       - name: Generate Sandwich integration artifacts
         run: |
-          poetry run python scripts/run_sandwich_integration.py \
+          poetry run python scripts/fdm/run_sandwich_integration.py \
             --case "${{ matrix.case }}" \
             --output-dir artifacts/sandwich_integration
 

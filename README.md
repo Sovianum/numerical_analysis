@@ -12,9 +12,9 @@ This project contains Python implementations of numerical analysis methods, spec
     - `solver/` - FDM mesh blocks, Laplace update, and mesh utilities
 - `tests/` - Test suite
   - `__init__.py` - Tests package
-  - `test_sandwich.py` - Comprehensive pytest test suite
+  - `fdm/` - FDM pytest test suite
 - `scripts/` - Reproducible command-line runners
-  - `run_sandwich_integration.py` - Generate Sandwich integration CSV/PNG artifacts
+  - `fdm/` - Generate FDM integration CSV/PNG artifacts
 - `pyproject.toml` - Poetry configuration and dependencies
 - `README.md` - This documentation file
 
@@ -215,9 +215,10 @@ numerical_analysis/
 │   │   └── solver/              # FDM solver primitives
 ├── tests/                       # Test suite
 │   ├── __init__.py              # Tests package
-│   └── test_sandwich.py         # Comprehensive pytest tests
+│   └── fdm/                     # FDM pytest tests
 ├── scripts/                     # Command-line runners
-│   └── run_sandwich_integration.py
+│   └── fdm/
+│       └── run_sandwich_integration.py
 ├── .github/                     # GitHub configuration
 │   └── workflows/               # GitHub Actions workflows
 │       └── test.yml             # CI workflow with coverage
