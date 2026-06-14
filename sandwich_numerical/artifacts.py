@@ -483,9 +483,7 @@ def write_all_cases_comparison_figures(
 
 def discover_case_directories(output_dir: Path) -> tuple[str, ...]:
     known_cases = [
-        case_name
-        for case_name in ci_case_names()
-        if (output_dir / case_name).is_dir()
+        case_name for case_name in ci_case_names() if (output_dir / case_name).is_dir()
     ]
     if known_cases:
         return tuple(known_cases)
