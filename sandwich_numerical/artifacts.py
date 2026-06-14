@@ -341,10 +341,6 @@ def write_solution_figures(
         ),
         case_dir / "samples.png",
     )
-    write_figure_png(
-        make_residuals_figure(solution.residuals, f"Residual {run.name}"),
-        case_dir / "residuals.png",
-    )
 
 
 def make_heatmap_figure(
@@ -430,7 +426,6 @@ def write_case_comparison_figures(
         return
 
     samples_by_solver = load_solver_csvs(case_dir, "samples.csv")
-    residuals_by_solver = load_solver_csvs(case_dir, "residuals.csv")
     write_figure_png(
         make_solver_samples_comparison_figure(
             samples_by_solver,
@@ -438,13 +433,6 @@ def write_case_comparison_figures(
             layer_boundary_x2(run),
         ),
         comparison_dir / "displacement_sections.png",
-    )
-    write_figure_png(
-        make_solver_residuals_comparison_figure(
-            residuals_by_solver,
-            f"Residuals {run.name}",
-        ),
-        comparison_dir / "residuals.png",
     )
 
 
@@ -459,10 +447,6 @@ def write_all_cases_comparison_figures(
         case_name: load_solver_csvs(output_dir / case_name, "samples.csv")
         for case_name in cases
     }
-    residuals_by_case = {
-        case_name: load_solver_csvs(output_dir / case_name, "residuals.csv")
-        for case_name in cases
-    }
     runs_by_case = {case_name: run_for_case_name(case_name) for case_name in cases}
 
     comparison_dir = output_dir / "comparison"
@@ -470,12 +454,6 @@ def write_all_cases_comparison_figures(
     write_figure_png(
         make_all_cases_samples_comparison_figure(samples_by_case, runs_by_case),
         comparison_dir / "displacement_sections_all_cases.png",
-        width=1600,
-        height=1800,
-    )
-    write_figure_png(
-        make_all_cases_residuals_comparison_figure(residuals_by_case),
-        comparison_dir / "residuals_all_cases.png",
         width=1600,
         height=1800,
     )
@@ -529,16 +507,6 @@ def make_solver_samples_comparison_figure(
     return fig
 
 
-def make_solver_residuals_comparison_figure(
-    residuals_by_solver: Mapping[str, pd.DataFrame], title: str
-) -> Figure:
-    fig, ax = plt.subplots(figsize=(11.2, 6.5))
-    plot_residuals_comparison(ax, residuals_by_solver)
-    ax.set_title(title)
-    ax.legend()
-    return fig
-
-
 def make_all_cases_samples_comparison_figure(
     samples_by_case: Mapping[str, Mapping[str, pd.DataFrame]],
     runs_by_case: Mapping[str, SandwichRun],
@@ -551,18 +519,6 @@ def make_all_cases_samples_comparison_figure(
             samples_by_case[case_name],
             layer_boundary_x2(runs_by_case[case_name]),
         )
-        ax.set_title(case_name)
-    add_shared_legend(fig, axes)
-    return fig
-
-
-def make_all_cases_residuals_comparison_figure(
-    residuals_by_case: Mapping[str, Mapping[str, pd.DataFrame]]
-) -> Figure:
-    case_names = tuple(residuals_by_case)
-    fig, axes = make_case_subplots(case_names)
-    for ax, case_name in zip(axes, case_names):
-        plot_residuals_comparison(ax, residuals_by_case[case_name])
         ax.set_title(case_name)
     add_shared_legend(fig, axes)
     return fig
@@ -602,23 +558,6 @@ def plot_samples_comparison(
     add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
-    ax.grid(True, alpha=0.3)
-
-
-def plot_residuals_comparison(
-    ax: Axes, residuals_by_solver: Mapping[str, pd.DataFrame]
-) -> None:
-    markers = {"fdm": "o", "fem": "s"}
-    for solver_name in SOLVER_NAMES:
-        residuals = residuals_by_solver[solver_name]
-        ax.plot(
-            residuals["iteration"],
-            residuals["residual"],
-            label=solver_name,
-            marker=markers[solver_name],
-        )
-    ax.set_xlabel("iteration")
-    ax.set_ylabel("residual")
     ax.grid(True, alpha=0.3)
 
 

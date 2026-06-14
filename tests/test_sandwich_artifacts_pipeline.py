@@ -6,7 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from sandwich_numerical import artifacts
@@ -34,22 +33,7 @@ def write_solver_tables(case_dir: Path) -> None:
         residual_table(scale).to_csv(solver_dir / "residuals.csv", index=False)
 
 
-def test_residual_comparison_accepts_single_iteration_point() -> None:
-    fig = artifacts.make_solver_residuals_comparison_figure(
-        {
-            "fdm": residual_table(1.0),
-            "fem": residual_table(0.5),
-        },
-        "residuals",
-    )
-    try:
-        assert len(fig.axes[0].lines) == 2
-        assert [line.get_marker() for line in fig.axes[0].lines] == ["o", "s"]
-    finally:
-        plt.close(fig)
-
-
-def test_all_case_comparison_writes_expected_pngs(tmp_path: Path) -> None:
+def test_all_case_comparison_writes_only_displacement_png(tmp_path: Path) -> None:
     output_dir = tmp_path / "artifacts"
     case_names = artifacts.ci_case_names()[:2]
     for case_name in case_names:
@@ -59,7 +43,7 @@ def test_all_case_comparison_writes_expected_pngs(tmp_path: Path) -> None:
 
     comparison_dir = output_dir / "comparison"
     assert (comparison_dir / "displacement_sections_all_cases.png").exists()
-    assert (comparison_dir / "residuals_all_cases.png").exists()
+    assert not (comparison_dir / "residuals_all_cases.png").exists()
 
 
 def test_unified_cli_local_csv_smoke(tmp_path: Path) -> None:
@@ -104,7 +88,12 @@ def test_unified_cli_ci_like_case_writes_comparison_pngs(tmp_path: Path) -> None
     assert result.returncode == 0, result.stderr
     comparison_dir = output_dir / "grad_factors_1_1_1_load_sin" / "comparison"
     assert (comparison_dir / "displacement_sections.png").exists()
-    assert (comparison_dir / "residuals.png").exists()
+    assert not (comparison_dir / "residuals.png").exists()
+
+    for solver_name in artifacts.SOLVER_NAMES:
+        solver_dir = output_dir / "grad_factors_1_1_1_load_sin" / solver_name
+        assert (solver_dir / "residuals.csv").exists()
+        assert not (solver_dir / "residuals.png").exists()
 
 
 def run_artifact_cli(*args: str) -> subprocess.CompletedProcess[str]:
