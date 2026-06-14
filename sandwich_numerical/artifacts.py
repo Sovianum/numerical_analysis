@@ -49,6 +49,15 @@ class CaseSolver(Protocol):
 FIGURE_WIDTH = 1120
 FIGURE_HEIGHT = 650
 DISPLACEMENT_CMAP = "bwr"
+LAYER_GRID_SUBDIVISIONS = 5
+LAYER_BOUNDARY_COLOR = "black"
+LAYER_BOUNDARY_LINESTYLE = "-"
+LAYER_BOUNDARY_LINEWIDTH = 1.4
+LAYER_BOUNDARY_ALPHA = 0.9
+LAYER_GRID_COLOR = "black"
+LAYER_GRID_LINESTYLE = "-"
+LAYER_GRID_LINEWIDTH = 0.45
+LAYER_GRID_ALPHA = 0.18
 LOAD_SHAPE_NAME_BY_GRADIENT_PROFILE = {
     GRADIENT_PROFILE_SINE: "load_sin",
     GRADIENT_PROFILE_PARABOLIC_ZERO_MEAN: "load_parabolic",
@@ -357,6 +366,7 @@ def make_heatmap_figure(
     ax.set_title(title)
     ax.set_xlabel("x1 column")
     ax.set_ylabel("x2 row")
+    add_layer_aligned_y_grid(ax, layer_boundaries)
     add_horizontal_layer_boundaries(ax, layer_boundaries, data.shape[0])
     fig.colorbar(image, ax=ax, label="displacement")
     return fig
@@ -370,11 +380,12 @@ def make_samples_figure(
         if column == "x2":
             continue
         ax.plot(samples["x2"], samples[column], label=column)
+    add_layer_aligned_x_grid(ax, layer_boundaries)
     add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_title(title)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
-    ax.grid(True, alpha=0.3)
+    ax.grid(True, axis="y", alpha=0.3)
     ax.legend()
     return fig
 
@@ -387,7 +398,12 @@ def add_horizontal_layer_boundaries(
     for boundary in layer_boundaries:
         if 0 < boundary < row_count - 1:
             ax.axhline(
-                boundary, color="black", linestyle="--", linewidth=0.8, alpha=0.5
+                boundary,
+                color=LAYER_BOUNDARY_COLOR,
+                linestyle=LAYER_BOUNDARY_LINESTYLE,
+                linewidth=LAYER_BOUNDARY_LINEWIDTH,
+                alpha=LAYER_BOUNDARY_ALPHA,
+                zorder=4,
             )
 
 
@@ -399,11 +415,12 @@ def add_vertical_layer_boundaries(
     for index, boundary in enumerate(layer_boundaries):
         ax.axvline(
             boundary,
-            color="black",
-            linestyle="--",
-            linewidth=0.8,
-            alpha=0.5,
+            color=LAYER_BOUNDARY_COLOR,
+            linestyle=LAYER_BOUNDARY_LINESTYLE,
+            linewidth=LAYER_BOUNDARY_LINEWIDTH,
+            alpha=LAYER_BOUNDARY_ALPHA,
             label="layer boundary" if index == 0 else "_nolegend_",
+            zorder=4,
         )
 
 
@@ -555,10 +572,90 @@ def plot_samples_comparison(
                 label=f"{solver_name} {column}",
                 linestyle=linestyles[solver_name],
             )
-    add_vertical_layer_boundaries(ax, layer_boundaries)
     ax.set_xlabel("x2")
     ax.set_ylabel("displacement")
-    ax.grid(True, alpha=0.3)
+    add_layer_aligned_x_grid(ax, layer_boundaries)
+    add_vertical_layer_boundaries(ax, layer_boundaries)
+    ax.grid(True, axis="y", alpha=0.3)
+
+
+def add_layer_aligned_x_grid(ax: Axes, layer_boundaries: np.ndarray | None) -> None:
+    ticks = layer_aligned_ticks(layer_boundaries, *ax.get_xlim())
+    if ticks.size == 0:
+        ax.grid(True, alpha=0.3)
+        return
+
+    ax.set_xticks(ticks, minor=True)
+    ax.tick_params(axis="x", which="minor", length=0)
+    ax.grid(False, axis="x", which="major")
+    ax.grid(
+        True,
+        axis="x",
+        which="minor",
+        color=LAYER_GRID_COLOR,
+        linestyle=LAYER_GRID_LINESTYLE,
+        linewidth=LAYER_GRID_LINEWIDTH,
+        alpha=LAYER_GRID_ALPHA,
+    )
+
+
+def add_layer_aligned_y_grid(ax: Axes, layer_boundaries: np.ndarray | None) -> None:
+    ticks = layer_aligned_ticks(layer_boundaries, *ax.get_ylim())
+    if ticks.size == 0:
+        return
+
+    ax.set_yticks(ticks, minor=True)
+    ax.tick_params(axis="y", which="minor", length=0)
+    ax.grid(
+        True,
+        axis="y",
+        which="minor",
+        color=LAYER_GRID_COLOR,
+        linestyle=LAYER_GRID_LINESTYLE,
+        linewidth=LAYER_GRID_LINEWIDTH,
+        alpha=LAYER_GRID_ALPHA,
+    )
+
+
+def layer_aligned_ticks(
+    layer_boundaries: np.ndarray | None,
+    lower: float,
+    upper: float,
+    subdivisions: int = LAYER_GRID_SUBDIVISIONS,
+) -> np.ndarray:
+    if layer_boundaries is None or subdivisions <= 0:
+        return np.array([], dtype=float)
+
+    boundaries = np.asarray(layer_boundaries, dtype=float)
+    boundaries = np.sort(boundaries[np.isfinite(boundaries)])
+    if boundaries.size == 0:
+        return np.array([], dtype=float)
+
+    axis_min = min(lower, upper)
+    axis_max = max(lower, upper)
+    layer_thickness = infer_layer_thickness(boundaries, axis_min, axis_max)
+    if layer_thickness <= 0:
+        return np.array([], dtype=float)
+
+    spacing = layer_thickness / subdivisions
+    layers_before = int(np.ceil((boundaries[0] - axis_min) / layer_thickness))
+    first_layer_start = boundaries[0] - layers_before * layer_thickness
+    count = int(np.ceil((axis_max - first_layer_start) / spacing)) + 1
+    ticks = first_layer_start + spacing * np.arange(count + 1, dtype=float)
+    tolerance = spacing * 1e-6
+    return np.asarray(
+        ticks[(axis_min - tolerance <= ticks) & (ticks <= axis_max + tolerance)],
+        dtype=float,
+    )
+
+
+def infer_layer_thickness(
+    layer_boundaries: np.ndarray, axis_min: float, axis_max: float
+) -> float:
+    if layer_boundaries.size >= 2:
+        return float(np.median(np.diff(layer_boundaries)))
+
+    return float(max(layer_boundaries[0] - axis_min, axis_max - layer_boundaries[0]))
 
 
 def add_shared_legend(fig: Figure, axes: Sequence[Axes]) -> None:

@@ -6,7 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
+import pytest
 
 from sandwich_numerical import artifacts
 
@@ -44,6 +47,52 @@ def test_all_case_comparison_writes_only_displacement_png(tmp_path: Path) -> Non
     comparison_dir = output_dir / "comparison"
     assert (comparison_dir / "displacement_sections_all_cases.png").exists()
     assert not (comparison_dir / "residuals_all_cases.png").exists()
+
+
+def test_layer_aligned_ticks_subdivide_layer_thickness() -> None:
+    ticks = artifacts.layer_aligned_ticks(
+        np.array([0.1025, 0.2075]),
+        lower=0.0,
+        upper=0.31,
+    )
+
+    np.testing.assert_allclose(np.diff(ticks), 0.105 / 5, rtol=0, atol=1e-14)
+    assert ticks.tolist() == pytest.approx(
+        [
+            0.0185,
+            0.0395,
+            0.0605,
+            0.0815,
+            0.1025,
+            0.1235,
+            0.1445,
+            0.1655,
+            0.1865,
+            0.2075,
+            0.2285,
+            0.2495,
+            0.2705,
+            0.2915,
+        ]
+    )
+
+
+def test_samples_figure_uses_layer_aligned_grid_and_bright_boundaries() -> None:
+    fig = artifacts.make_samples_figure(
+        sample_table(1.0),
+        "samples",
+        layer_boundaries=np.array([0.5]),
+    )
+    try:
+        boundary = fig.axes[0].lines[-1]
+
+        assert boundary.get_label() == "layer boundary"
+        assert boundary.get_linestyle() == "-"
+        assert boundary.get_linewidth() == pytest.approx(1.4)
+        assert boundary.get_alpha() == pytest.approx(0.9)
+        assert fig.axes[0].get_xticks(minor=True).size > 0
+    finally:
+        plt.close(fig)
 
 
 def test_unified_cli_local_csv_smoke(tmp_path: Path) -> None:
